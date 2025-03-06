@@ -1,0 +1,23 @@
+{
+  "name": "remonkey",
+  "version": "0.0.0",
+  "scripts": {
+    "res:build": "rescript",
+    "res:clean": "rescript clean",
+    "res:dev": "rescript",
+    "res:dev-w": "rescript -w",
+    "test": "retest tests/*.mjs"
+  },
+  "keywords": [
+    "rescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@rescript/core": "1.6.1",
+    "rescript": "11.1.4"
+  },
+  "devDependencies": {
+    "rescript-test": "^7.0.1"
+  }
+}
