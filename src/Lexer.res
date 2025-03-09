@@ -1,15 +1,14 @@
+type lexer = {
+  input: string,
+  mutable position: int,
+  mutable read_position: int,
+  mutable ch: string,
+}
+
 module Lexer: {
-  type lexer
   let newLexer: string => lexer
   let nextToken: lexer => Token.token
 } = {
-  type lexer = {
-    input: string,
-    mutable position: int,
-    mutable read_position: int,
-    mutable ch: string,
-  }
-
   let zero: string = ""
   let digit_expression = %re("/^\d$/")
   let white_spaces = [" ", "\t", "\n", "\r"]

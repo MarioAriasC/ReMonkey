@@ -1,0 +1,188 @@
+open Lexer
+
+type parser = {
+  lexer: lexer,
+  errors: array<string>,
+  mutable curToken: Token.token,
+  mutable peekToken: Token.token,
+}
+
+module Parser: {
+  let newParser: lexer => parser
+  let parseProgram: parser => AST.program
+  // let errors: parser => list<string>
+} = {
+  type precedence =
+    | @as(0) Lowest
+    | @as(1) Equals
+    | @as(2) LessGreater
+    | @as(3) Sum
+    | @as(4) Product
+    | @as(5) Prefix
+    | @as(6) Call
+    | @as(7) Index
+
+  let nextToken = (p: parser) => {
+    p.curToken = p.peekToken
+    p.peekToken = p.lexer->Lexer.nextToken
+  }
+
+  let newParser = (l: lexer) => {
+    {
+      lexer: l,
+      errors: [],
+      curToken: Token.newToken(Token.Illegal, ""),
+      peekToken: Token.newToken(Token.Illegal, ""),
+    }->Utils.also(p => {
+      p->nextToken
+      p->nextToken
+    })
+  }
+
+  let peekTokenIs = (p: parser, tt: Token.tokenType) => p.peekToken.token_type == tt
+
+  let peekError = (p: parser, tt: Token.tokenType) => {
+    Array.push(
+      p.errors,
+      `Expected next token to be ${String.make(tt)}, got ${String.make(
+          p.peekToken.token_type,
+        )} instead`,
+    )
+  }
+
+  let noPrefixParserError = (p: parser, tt: Token.tokenType) => {
+    Array.push(p.errors, `No prefix parser for ${String.make(tt)} function`)
+  }
+
+  let expectPeek = (p: parser, tt: Token.tokenType) => {
+    if p->peekTokenIs(tt) {
+      p->nextToken
+      true
+    } else {
+      p->peekError(tt)
+      false
+    }
+  }
+
+  let parseIntegerLiteral = (p: parser) => {
+    let token = p.curToken
+    switch Int.fromString(token.literal) {
+    | Some(value) => Some(AST.IntegerLiteral({token, value}))
+    | None => {
+        Array.push(p.errors, `could not parse ${token.literal} as integer`)
+        None
+      }
+    }
+  }
+
+  let curTokenIs = (p: parser, tt: Token.tokenType) => p.curToken.token_type == tt
+
+  let parseBooleanLiteral = (p: parser) => {
+    Some(AST.BooleanLiteral({token: p.curToken, value: p->curTokenIs(Token.True)}))
+  }
+
+  let parseIdentifier = (p: parser) => Some(
+    AST.Identifier({token: p.curToken, value: p.curToken.literal}),
+  )
+
+  let prefixParser: Token.tokenType => option<parser => option<AST.statement>> = tt => {
+    switch tt {
+    | Token.Int => Some(parseIntegerLiteral)
+    | Token.True => Some(parseBooleanLiteral)
+    | Token.False => Some(parseBooleanLiteral)
+    | Token.Ident => Some(parseIdentifier)
+    | _ => None
+    }
+  }
+
+  let infixParser: (
+    parser,
+    Token.tokenType,
+  ) => option<(parser, option<AST.statement>) => option<AST.statement>> = (p, tt) => {
+    switch tt {
+    | _ => None
+    }
+  }
+
+  let findPrecedence = (tt: Token.tokenType) => {
+    switch tt {
+    | Token.Eq => Equals
+    | Token.NotEq => Equals
+    | Token.Lt => LessGreater
+    | Token.Gt => LessGreater
+    | Token.Plus => Sum
+    | Token.Minus => Sum
+    | Token.Slash => Product
+    | Token.Asterisk => Product
+    | Token.LParen => Call
+    | Token.LBracket => Index
+    | _ => Lowest
+    }
+  }
+
+  let peekPrecedence = (p: parser) => findPrecedence(p.peekToken.token_type)
+
+  let parseExpression = (p: parser, prec: precedence) => {
+    let prefix = prefixParser(p.curToken.token_type)
+    switch prefix {
+    | None => {
+        p->noPrefixParserError(p.curToken.token_type)
+        None
+      }
+    | Some(prefixFn) => {
+        let left = ref(p->prefixFn)
+        let break = ref(false)
+        while !break.contents && !(p->peekTokenIs(Token.Semicolon)) && prec < p->peekPrecedence {
+          let infix = p->infixParser(p.peekToken.token_type)
+          switch infix {
+          | None => break := true
+          | Some(infixFn) => {
+              p->nextToken
+              left := p->infixFn(left.contents)
+            }
+          }
+        }
+        left.contents
+      }
+    }
+  }
+
+  let parseLetStatement: parser => option<AST.statement> = (p: parser) => {
+    let token = p.curToken
+    if !(p->expectPeek(Token.Ident)) {
+      None
+    } else {
+      let name: AST.identifier = {token: p.curToken, value: p.curToken.literal}
+
+      if !(p->expectPeek(Token.Assign)) {
+        None
+      } else {
+        p->nextToken
+        let value = p->parseExpression(Lowest)
+
+        if p->peekTokenIs(Token.Semicolon) {
+          p->nextToken
+        }
+        Some(AST.LetStatement({token, name, value}))
+      }
+    }
+  }
+
+  let parseStatement = (p: parser) => {
+    switch p.curToken.token_type {
+    | Token.Let => p->parseLetStatement
+    | _ => raise(Failure("Not Implemented"))
+    }
+  }
+
+  let parseProgram: parser => AST.program = (p: parser) => {
+    let statements: array<AST.statement> = []
+
+    while p.curToken.token_type != Token.EOF {
+      let statement = p->parseStatement
+      statement->Option.forEach(s => statements->Array.push(s))
+      p->nextToken
+    }
+    {statements: statements}
+  }
+}
