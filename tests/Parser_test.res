@@ -169,3 +169,33 @@ test("integer literal", () => {
     assertIntegerLiteral(statement.expression, 5)
   })
 })
+
+test("parsing prefix expressions", () => {
+  [
+    ("!5;", "!", I(5)),
+    ("-15;", "-", I(15)),
+    ("!true;", "!", B(true)),
+    ("!false;", "!", B(false)),
+  ]->forEach(row => {
+    let (input, expectedOperator, expectedValue) = row
+    let program = createProgram(input)
+    assertCountStatements(1, program)
+    checkExpressionStatement(
+      program.statements[0],
+      statement => {
+        let expression = statement.expression
+        expression->assertStatement(
+          exp => {
+            switch exp {
+            | AST.PrefixExpression({operator, right}) => {
+                assertEqualsTyped(operator, expectedOperator)
+                assertLiteralExpression(right, expectedValue)
+              }
+            | _ => simpleFail(`expression "${String.make(expression)}" is not a PrefixExpression`)
+            }
+          },
+        )
+      },
+    )
+  })
+})

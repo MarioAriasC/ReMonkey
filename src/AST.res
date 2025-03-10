@@ -14,9 +14,11 @@ type rec statement =
   | BooleanLiteral(booleanLiteral)
   | ReturnStatement(returnStatement)
   | ExpressionStatement(expressionStatement)
+  | PrefixExpression(prefixExpression)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
 and returnStatement = {...tokenHolder, returnValue: option<statement>}
 and expressionStatement = {...tokenHolder, expression: option<statement>}
+and prefixExpression = {...tokenHolder, operator: string, right: option<statement>}
 // let tokenLiteral: statement => string = s => {
 //   switch s {
 //   | Identifier(i) => i.token.literal
@@ -40,6 +42,7 @@ module Statement = {
     | ReturnStatement({token, returnValue}) =>
       `${token.literal} ${returnValue->map(toString)->getOr("")}`
     | ExpressionStatement({expression}) => expression->map(toString)->getOr("")
+    | PrefixExpression({operator, right}) => `(${operator}${right->map(toString)->getOr("")})`
     }
   }
 }

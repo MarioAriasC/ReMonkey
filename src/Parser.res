@@ -85,16 +85,6 @@ module Parser: {
     AST.Identifier({token: p.curToken, value: p.curToken.literal}),
   )
 
-  let prefixParser: Token.tokenType => option<parser => option<AST.statement>> = tt => {
-    switch tt {
-    | Token.Int => Some(parseIntegerLiteral)
-    | Token.True => Some(parseBooleanLiteral)
-    | Token.False => Some(parseBooleanLiteral)
-    | Token.Ident => Some(parseIdentifier)
-    | _ => None
-    }
-  }
-
   let infixParser: (
     parser,
     Token.tokenType,
@@ -122,7 +112,7 @@ module Parser: {
 
   let peekPrecedence = (p: parser) => findPrecedence(p.peekToken.token_type)
 
-  let parseExpression = (p: parser, prec: precedence) => {
+  let rec parseExpression = (p: parser, prec: precedence) => {
     let prefix = prefixParser(p.curToken.token_type)
     switch prefix {
     | None => {
@@ -144,6 +134,24 @@ module Parser: {
         }
         left.contents
       }
+    }
+  }
+  and parsePrefixExpression = (p: parser) => {
+    let token = p.curToken
+    let operator = token.literal
+    p->nextToken
+    let right = p->parseExpression(Prefix)
+    Some(AST.PrefixExpression({token, operator, right}))
+  }
+  and prefixParser: Token.tokenType => option<parser => option<AST.statement>> = tt => {
+    switch tt {
+    | Token.Int => Some(parseIntegerLiteral)
+    | Token.True => Some(parseBooleanLiteral)
+    | Token.False => Some(parseBooleanLiteral)
+    | Token.Ident => Some(parseIdentifier)
+    | Token.Bang => Some(parsePrefixExpression)
+    | Token.Minus => Some(parsePrefixExpression)
+    | _ => None
     }
   }
 
