@@ -61,15 +61,19 @@ let assertBooleanLiteral = (statement: option<AST.statement>, b: bool) => {
   })
 }
 
-let assertIdentifier = (statement: option<AST.statement>, i: string) => {
+let checkIdentifier = (statement: option<AST.statement>, body: AST.identifier => unit) => {
   statement->assertStatement(s => {
     switch s {
-    | AST.Identifier(identifier) => {
-        assertEqualsTyped(i, identifier.value)
-        assertEqualsTyped(i, identifier.token.literal)
-      }
-    | _ => simpleFail("statement is not an Identifier")
+    | AST.Identifier(identifier) => body(identifier)
+    | _ => simpleFail(`statement "${String.make(s)}" is not Identifier`)
     }
+  })
+}
+
+let assertIdentifier = (statement: option<AST.statement>, i: string) => {
+  statement->checkIdentifier(identifier => {
+    assertEqualsTyped(i, identifier.value)
+    assertEqualsTyped(i, identifier.token.literal)
   })
 }
 
@@ -79,6 +83,18 @@ let assertLiteralExpression = (value: option<AST.statement>, expectedValue: test
   | B(b) => assertBooleanLiteral(value, b)
   | S(s) => assertIdentifier(value, s)
   }
+}
+
+let checkExpressionStatement = (
+  statement: option<AST.statement>,
+  body: AST.expressionStatement => unit,
+) => {
+  statement->assertStatement(s => {
+    switch s {
+    | AST.ExpressionStatement(expression) => body(expression)
+    | _ => simpleFail(`statement "${String.make(s)}" is not a ExpressionStatement`)
+    }
+  })
 }
 
 test("Let Statements", () => {
@@ -126,6 +142,20 @@ test("Return Statements", () => {
           }
         | _ => simpleFail("statement is not an ReturnStatement")
         }
+      },
+    )
+  })
+})
+
+test("identifier expression", () => {
+  let input = "foobar;"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    checkIdentifier(
+      statement.expression,
+      identifier => {
+        assertEqualsTyped("foobar", identifier.token.literal)
       },
     )
   })
