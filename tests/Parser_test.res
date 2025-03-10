@@ -106,3 +106,27 @@ test("Let Statements", () => {
     )
   })
 })
+
+test("Return Statements", () => {
+  [
+    ("return 5;", I(5)),
+    ("return true;", B(true)),
+    ("return foobar;", S("foobar")),
+  ]->forEach(row => {
+    let (input, expectedValue) = row
+    let program = createProgram(input)
+    assertCountStatements(1, program)
+    let statement = program.statements[0]
+    statement->Option.forEach(
+      returnStatement => {
+        switch returnStatement {
+        | AST.ReturnStatement({token, returnValue}) => {
+            assertEqualsTyped("return", token.literal)
+            assertLiteralExpression(returnValue, expectedValue)
+          }
+        | _ => simpleFail("statement is not an ReturnStatement")
+        }
+      },
+    )
+  })
+})

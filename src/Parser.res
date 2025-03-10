@@ -147,7 +147,7 @@ module Parser: {
     }
   }
 
-  let parseLetStatement: parser => option<AST.statement> = (p: parser) => {
+  let parseLetStatement: parser => option<AST.statement> = p => {
     let token = p.curToken
     if !(p->expectPeek(Token.Ident)) {
       None
@@ -168,14 +168,38 @@ module Parser: {
     }
   }
 
+  let parseReturnStatement: parser => option<AST.statement> = p => {
+    let token = p.curToken
+    p->nextToken
+    let returnValue = p->parseExpression(Lowest)
+
+    while p->peekTokenIs(Token.Semicolon) {
+      p->nextToken
+    }
+
+    Some(AST.ReturnStatement({token, returnValue}))
+  }
+
+  let parseExpressionStatement: parser => option<AST.statement> = p => {
+    let token = p.curToken
+    let expression = p->parseExpression(Lowest)
+
+    if p->peekTokenIs(Token.Semicolon) {
+      p->nextToken
+    }
+
+    Some(AST.ExpressionStatement({token, expression}))
+  }
+
   let parseStatement = (p: parser) => {
     switch p.curToken.token_type {
     | Token.Let => p->parseLetStatement
-    | _ => raise(Failure("Not Implemented"))
+    | Token.Return => p->parseReturnStatement
+    | _ => p->parseExpressionStatement
     }
   }
 
-  let parseProgram: parser => AST.program = (p: parser) => {
+  let parseProgram: parser => AST.program = p => {
     let statements: array<AST.statement> = []
 
     while p.curToken.token_type != Token.EOF {

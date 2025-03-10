@@ -12,8 +12,11 @@ type rec statement =
   | LetStatement(letStatement)
   | IntegerLiteral(integerLiteral)
   | BooleanLiteral(booleanLiteral)
+  | ReturnStatement(returnStatement)
+  | ExpressionStatement(expressionStatement)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
-
+and returnStatement = {...tokenHolder, returnValue: option<statement>}
+and expressionStatement = {...tokenHolder, expression: option<statement>}
 // let tokenLiteral: statement => string = s => {
 //   switch s {
 //   | Identifier(i) => i.token.literal
@@ -34,6 +37,9 @@ module Statement = {
         ->getOr("")}`
     | IntegerLiteral(i) => i.token.literal
     | BooleanLiteral(b) => b.token.literal
+    | ReturnStatement({token, returnValue}) =>
+      `${token.literal} ${returnValue->map(toString)->getOr("")}`
+    | ExpressionStatement({expression}) => expression->map(toString)->getOr("")
     }
   }
 }
