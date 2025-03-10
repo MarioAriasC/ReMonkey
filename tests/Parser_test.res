@@ -97,6 +97,24 @@ let checkExpressionStatement = (
   })
 }
 
+let assertInfixExpression = (
+  expression: option<AST.statement>,
+  leftValue: testParam,
+  expectedOperator: string,
+  rightValue: testParam,
+) => {
+  expression->assertStatement(exp => {
+    switch exp {
+    | AST.InfixExpression({token, left, operator, right}) => {
+        assertLiteralExpression(left, leftValue)
+        assertEqualsTyped(operator, expectedOperator)
+        assertLiteralExpression(right, rightValue)
+      }
+    | _ => simpleFail(`expression "${AST.Statement.toString(exp)}" is not an InfixExpression"`)
+    }
+  })
+}
+
 test("Let Statements", () => {
   [
     ("let x = 5;", "x", I(5)),
@@ -195,6 +213,32 @@ test("parsing prefix expressions", () => {
             }
           },
         )
+      },
+    )
+  })
+})
+
+test("parsing infix expressions", () => {
+  [
+    ("5 + 5", I(5), "+", I(5)),
+    ("5 - 5", I(5), "-", I(5)),
+    ("5 * 5", I(5), "*", I(5)),
+    ("5 / 5", I(5), "/", I(5)),
+    ("5 > 5", I(5), ">", I(5)),
+    ("5 < 5", I(5), "<", I(5)),
+    ("5 == 5", I(5), "==", I(5)),
+    ("5 != 5", I(5), "!=", I(5)),
+    ("true == true", B(true), "==", B(true)),
+    ("true != true", B(true), "!=", B(true)),
+    ("false == false", B(false), "==", B(false)),
+  ]->forEach(row => {
+    let (input, leftValue, operator, rightValue) = row
+    let program = createProgram(input)
+    assertCountStatements(1, program)
+    checkExpressionStatement(
+      program.statements[0],
+      statement => {
+        assertInfixExpression(statement.expression, leftValue, operator, rightValue)
       },
     )
   })

@@ -85,15 +85,6 @@ module Parser: {
     AST.Identifier({token: p.curToken, value: p.curToken.literal}),
   )
 
-  let infixParser: (
-    parser,
-    Token.tokenType,
-  ) => option<(parser, option<AST.statement>) => option<AST.statement>> = (p, tt) => {
-    switch tt {
-    | _ => None
-    }
-  }
-
   let findPrecedence = (tt: Token.tokenType) => {
     switch tt {
     | Token.Eq => Equals
@@ -112,6 +103,8 @@ module Parser: {
 
   let peekPrecedence = (p: parser) => findPrecedence(p.peekToken.token_type)
 
+  let curPrecedence = (p: parser) => findPrecedence(p.curToken.token_type)
+
   let rec parseExpression = (p: parser, prec: precedence) => {
     let prefix = prefixParser(p.curToken.token_type)
     switch prefix {
@@ -123,7 +116,7 @@ module Parser: {
         let left = ref(p->prefixFn)
         let break = ref(false)
         while !break.contents && !(p->peekTokenIs(Token.Semicolon)) && prec < p->peekPrecedence {
-          let infix = p->infixParser(p.peekToken.token_type)
+          let infix = infixParser(p.peekToken.token_type)
           switch infix {
           | None => break := true
           | Some(infixFn) => {
@@ -153,6 +146,29 @@ module Parser: {
     | Token.Minus => Some(parsePrefixExpression)
     | _ => None
     }
+  }
+  and infixParser: Token.tokenType => option<
+    (parser, option<AST.statement>) => option<AST.statement>,
+  > = tt => {
+    switch tt {
+    | Token.Plus => Some(parseInfixExpression)
+    | Token.Minus => Some(parseInfixExpression)
+    | Token.Slash => Some(parseInfixExpression)
+    | Token.Asterisk => Some(parseInfixExpression)
+    | Token.Eq => Some(parseInfixExpression)
+    | Token.NotEq => Some(parseInfixExpression)
+    | Token.Lt => Some(parseInfixExpression)
+    | Token.Gt => Some(parseInfixExpression)
+    | _ => None
+    }
+  }
+  and parseInfixExpression = (p: parser, left: option<AST.statement>) => {
+    let token = p.curToken
+    let operator = token.literal
+    let prec = p->curPrecedence
+    p->nextToken
+    let right = p->parseExpression(prec)
+    Some(AST.InfixExpression({token, left, operator, right}))
   }
 
   let parseLetStatement: parser => option<AST.statement> = p => {
