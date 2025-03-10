@@ -160,3 +160,12 @@ test("identifier expression", () => {
     )
   })
 })
+
+test("integer literal", () => {
+  let input = "5;"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    assertIntegerLiteral(statement.expression, 5)
+  })
+})
