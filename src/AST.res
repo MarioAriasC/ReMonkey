@@ -16,6 +16,9 @@ type rec statement =
   | ExpressionStatement(expressionStatement)
   | PrefixExpression(prefixExpression)
   | InfixExpression(infixExpression)
+  | CallExpression(callExpression)
+  | ArrayLiteral(arrayLiteral)
+  | IndexExpression(indexExpression)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
 and returnStatement = {...tokenHolder, returnValue: option<statement>}
 and expressionStatement = {...tokenHolder, expression: option<statement>}
@@ -26,33 +29,45 @@ and infixExpression = {
   operator: string,
   right: option<statement>,
 }
-// let tokenLiteral: statement => string = s => {
-//   switch s {
-//   | Identifier(i) => i.token.literal
-//   | StringLiteral(i) => i.token.literal
-//   | LetStatement(l) => l.token.literal
-//   }
-// }
+and optionStatementArray = option<array<option<statement>>>
+and callExpression = {
+  ...tokenHolder,
+  function: option<statement>,
+  arguments: optionStatementArray,
+}
+and arrayLiteral = {...tokenHolder, elements: optionStatementArray}
+and indexExpression = {...tokenHolder, left: option<statement>, index: option<statement>}
 
 module Statement = {
   let rec toString: statement => string = s => {
-    open Option
     switch s {
     | Identifier(i) => i.value
     | StringLiteral(l) => l.value
     | LetStatement({token, name, value}) =>
-      `${token.literal} ${Identifier(name)->toString} = ${value
-        ->map(toString)
-        ->getOr("")}`
+      `${token.literal} ${Identifier(name)->toString} = ${value->optionToString}`
     | IntegerLiteral(i) => i.token.literal
     | BooleanLiteral(b) => b.token.literal
-    | ReturnStatement({token, returnValue}) =>
-      `${token.literal} ${returnValue->map(toString)->getOr("")}`
-    | ExpressionStatement({expression}) => expression->map(toString)->getOr("")
-    | PrefixExpression({operator, right}) => `(${operator}${right->map(toString)->getOr("")})`
+    | ReturnStatement({token, returnValue}) => `${token.literal} ${returnValue->optionToString}`
+    | ExpressionStatement({expression}) => expression->optionToString
+    | PrefixExpression({operator, right}) => `(${operator}${right->optionToString})`
     | InfixExpression({left, operator, right}) =>
-      `(${left->map(toString)->getOr("")} ${operator} ${right->map(toString)->getOr("")})`
+      `(${left->optionToString} ${operator} ${right->optionToString})`
+    | CallExpression({function, arguments}) =>
+      `${function->optionToString}(${arguments->argsToString})`
+    | ArrayLiteral({elements}) => `[${elements->argsToString}]`
+    | IndexExpression({left, index}) => `(${left->optionToString}[${index->optionToString}])`
     }
+  }
+  and argsToString: optionStatementArray => string = arguments => {
+    open Option
+    arguments
+    ->map(args => args->Array.map(optionToString))
+    ->getOr([""])
+    ->Array.join(", ")
+  }
+  and optionToString: option<statement> => string = arg => {
+    open Option
+    arg->map(toString)->getOr("")
   }
 }
 

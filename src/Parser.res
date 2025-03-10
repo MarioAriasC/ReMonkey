@@ -144,6 +144,8 @@ module Parser: {
     | Token.Ident => Some(parseIdentifier)
     | Token.Bang => Some(parsePrefixExpression)
     | Token.Minus => Some(parsePrefixExpression)
+    | Token.LParen => Some(parseGroupExpression)
+    | Token.LBracket => Some(parseArrayLiteral)
     | _ => None
     }
   }
@@ -159,6 +161,8 @@ module Parser: {
     | Token.NotEq => Some(parseInfixExpression)
     | Token.Lt => Some(parseInfixExpression)
     | Token.Gt => Some(parseInfixExpression)
+    | Token.LParen => Some(parseCallExpression)
+    | Token.LBracket => Some(parseIndexExpression)
     | _ => None
     }
   }
@@ -169,6 +173,56 @@ module Parser: {
     p->nextToken
     let right = p->parseExpression(prec)
     Some(AST.InfixExpression({token, left, operator, right}))
+  }
+  and parseGroupExpression = (p: parser) => {
+    p->nextToken
+    let exp = p->parseExpression(Lowest)
+    if !(p->expectPeek(Token.RParen)) {
+      None
+    } else {
+      exp
+    }
+  }
+  and parseCallExpression = (p: parser, left: option<AST.statement>) => {
+    let token = p.curToken
+    let arguments = p->parseExpressionList(Token.RParen)
+    Some(AST.CallExpression({token, function: left, arguments}))
+  }
+  and parseExpressionList = (p: parser, end: Token.tokenType) => {
+    let arguments: array<option<AST.statement>> = []
+    if p->peekTokenIs(end) {
+      p->nextToken
+      Some(arguments)
+    } else {
+      p->nextToken
+      arguments->Array.push(p->parseExpression(Lowest))
+
+      while p->peekTokenIs(Token.Comma) {
+        p->nextToken
+        p->nextToken
+        arguments->Array.push(p->parseExpression(Lowest))
+      }
+
+      if !(p->expectPeek(end)) {
+        None
+      } else {
+        Some(arguments)
+      }
+    }
+  }
+  and parseArrayLiteral = (p: parser) => {
+    let token = p.curToken
+    Some(AST.ArrayLiteral({token, elements: p->parseExpressionList(Token.RBracket)}))
+  }
+  and parseIndexExpression = (p: parser, left: option<AST.statement>) => {
+    let token = p.curToken
+    p->nextToken
+    let index = p->parseExpression(Lowest)
+    if !(p->expectPeek(Token.RBracket)) {
+      None
+    } else {
+      Some(AST.IndexExpression({token, left, index}))
+    }
   }
 
   let parseLetStatement: parser => option<AST.statement> = p => {

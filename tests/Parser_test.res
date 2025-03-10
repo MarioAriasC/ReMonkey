@@ -105,7 +105,7 @@ let assertInfixExpression = (
 ) => {
   expression->assertStatement(exp => {
     switch exp {
-    | AST.InfixExpression({token, left, operator, right}) => {
+    | AST.InfixExpression({left, operator, right}) => {
         assertLiteralExpression(left, leftValue)
         assertEqualsTyped(operator, expectedOperator)
         assertLiteralExpression(right, rightValue)
@@ -241,5 +241,44 @@ test("parsing infix expressions", () => {
         assertInfixExpression(statement.expression, leftValue, operator, rightValue)
       },
     )
+  })
+})
+
+test("operator precedence", () => {
+  [
+    ("-a * b", "((-a) * b)"),
+    ("!-a", "(!(-a))"),
+    ("a + b + c", "((a + b) + c)"),
+    ("a + b - c", "((a + b) - c)"),
+    ("a * b * c", "((a * b) * c)"),
+    ("a * b / c", "((a * b) / c)"),
+    ("a + b / c", "(a + (b / c))"),
+    ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+    ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+    ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+    ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+    ("3 + 4 * 5 == 3 * 1 + 4 * 5", "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))"),
+    ("true", "true"),
+    ("false", "false"),
+    ("3 > 5 == false", "((3 > 5) == false)"),
+    ("3 < 5 == true", "((3 < 5) == true)"),
+    ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+    ("(5 + 5) * 2", "((5 + 5) * 2)"),
+    ("2 / (5 + 5)", "(2 / (5 + 5))"),
+    ("(5 + 5) * 2 * (5 + 5)", "(((5 + 5) * 2) * (5 + 5))"),
+    ("-(5 + 5)", "(-(5 + 5))"),
+    ("!(true == true)", "(!(true == true))"),
+    ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+    (
+      "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+      "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+    ),
+    ("add(a + b + c * d / f + g)", "add((((a + b) + ((c * d) / f)) + g))"),
+    ("a * [1, 2, 3, 4][b * c] * d", "((a * ([1, 2, 3, 4][(b * c)])) * d)"),
+    ("add(a * b[2], b[1], 2 * [1, 2][1])", "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))"),
+  ]->forEach(row => {
+    let (input, expected) = row
+    let program = createProgram(input)
+    assertEqualsTyped(program->AST.Program.toString, expected)
   })
 })
