@@ -337,3 +337,49 @@ test("if expression", () => {
     )
   })
 })
+
+test("if else expression", () => {
+  let input = "if (x < y) {x} else {y}"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    chechIfExpression(
+      statement.expression,
+      exp => {
+        assertInfixExpression(exp.condition, S("x"), "<", S("y"))
+        assertEqualsTyped(
+          1,
+          exp.consequence
+          ->Option.flatMap(c => c.statements->Option.map(s => s->Array.length))
+          ->Option.getOr(-1),
+        )
+
+        let maybeConsequenceStatement =
+          exp.consequence->Option.flatMap(c => c.statements->Option.flatMap(s => s[0]))
+        maybeConsequenceStatement->Option.forEach(
+          statement => {
+            checkExpressionStatement(
+              statement,
+              consequence => {
+                assertIdentifier(consequence.expression, "x")
+              },
+            )
+          },
+        )
+
+        let maybeAlternativeStatement =
+          exp.alternative->Option.flatMap(a => a.statements->Option.flatMap(s => s[0]))
+        maybeAlternativeStatement->Option.forEach(
+          statement => {
+            checkExpressionStatement(
+              statement,
+              alternative => {
+                assertIdentifier(alternative.expression, "y")
+              },
+            )
+          },
+        )
+      },
+    )
+  })
+})
