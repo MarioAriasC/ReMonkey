@@ -19,6 +19,8 @@ type rec statement =
   | CallExpression(callExpression)
   | ArrayLiteral(arrayLiteral)
   | IndexExpression(indexExpression)
+  | BlockStatement(blockStatement)
+  | IfExpression(ifExpression)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
 and returnStatement = {...tokenHolder, returnValue: option<statement>}
 and expressionStatement = {...tokenHolder, expression: option<statement>}
@@ -37,9 +39,17 @@ and callExpression = {
 }
 and arrayLiteral = {...tokenHolder, elements: optionStatementArray}
 and indexExpression = {...tokenHolder, left: option<statement>, index: option<statement>}
+and blockStatement = {...tokenHolder, statements: optionStatementArray}
+and ifExpression = {
+  ...tokenHolder,
+  condition: option<statement>,
+  consequence: option<blockStatement>,
+  alternative: option<blockStatement>,
+}
 
 module Statement = {
   let rec toString: statement => string = s => {
+    open Option
     switch s {
     | Identifier(i) => i.value
     | StringLiteral(l) => l.value
@@ -56,15 +66,23 @@ module Statement = {
       `${function->optionToString}(${arguments->argsToString})`
     | ArrayLiteral({elements}) => `[${elements->argsToString}]`
     | IndexExpression({left, index}) => `(${left->optionToString}[${index->optionToString}])`
+    | BlockStatement({statements}) => statements->argsToStringWithSeparator("")
+    | IfExpression({condition, consequence, alternative}) =>
+      `if ${condition->optionToString} ${consequence
+        ->map(c => BlockStatement(c))
+        ->optionToString} ${alternative
+        ->map(alt => `else ${BlockStatement(alt)->toString}`)
+        ->getOr("")}`
     }
   }
-  and argsToString: optionStatementArray => string = arguments => {
+  and argsToStringWithSeparator = (arguments: optionStatementArray, separator: string) => {
     open Option
     arguments
     ->map(args => args->Array.map(optionToString))
     ->getOr([""])
-    ->Array.join(", ")
+    ->Array.join(separator)
   }
+  and argsToString = (arguments: optionStatementArray) => argsToStringWithSeparator(arguments, ", ")
   and optionToString: option<statement> => string = arg => {
     open Option
     arg->map(toString)->getOr("")

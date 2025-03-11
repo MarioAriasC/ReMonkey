@@ -115,6 +115,15 @@ let assertInfixExpression = (
   })
 }
 
+let chechIfExpression = (statement: option<AST.statement>, body: AST.ifExpression => unit) => {
+  statement->assertStatement(s => {
+    switch s {
+    | AST.IfExpression(ifExpression) => body(ifExpression)
+    | _ => simpleFail(`statement "${s->AST.Statement.toString} is not IfExpression"`)
+    }
+  })
+}
+
 test("Let Statements", () => {
   [
     ("let x = 5;", "x", I(5)),
@@ -280,5 +289,51 @@ test("operator precedence", () => {
     let (input, expected) = row
     let program = createProgram(input)
     assertEqualsTyped(program->AST.Program.toString, expected)
+  })
+})
+
+test("boolean expression", () => {
+  [("true", B(true)), ("false", B(false))]->forEach(row => {
+    let (input, expectedBoolean) = row
+    let program = createProgram(input)
+    assertCountStatements(1, program)
+    checkExpressionStatement(
+      program.statements[0],
+      statement => {
+        assertLiteralExpression(statement.expression, expectedBoolean)
+      },
+    )
+  })
+})
+
+test("if expression", () => {
+  let input = "if (x < y) {x}"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    chechIfExpression(
+      statement.expression,
+      exp => {
+        assertInfixExpression(exp.condition, S("x"), "<", S("y"))
+        assertEqualsTyped(
+          1,
+          exp.consequence
+          ->Option.flatMap(c => c.statements->Option.map(s => s->Array.length))
+          ->Option.getOr(-1),
+        )
+        let maybeStatement =
+          exp.consequence->Option.flatMap(c => c.statements->Option.flatMap(s => s[0]))
+        maybeStatement->Option.forEach(
+          statement => {
+            checkExpressionStatement(
+              statement,
+              consequence => {
+                assertIdentifier(consequence.expression, "x")
+              },
+            )
+          },
+        )
+      },
+    )
   })
 })

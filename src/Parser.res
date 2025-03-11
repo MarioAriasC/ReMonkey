@@ -146,6 +146,7 @@ module Parser: {
     | Token.Minus => Some(parsePrefixExpression)
     | Token.LParen => Some(parseGroupExpression)
     | Token.LBracket => Some(parseArrayLiteral)
+    | Token.If => Some(parseIfExpression)
     | _ => None
     }
   }
@@ -225,7 +226,7 @@ module Parser: {
     }
   }
 
-  let parseLetStatement: parser => option<AST.statement> = p => {
+  and parseLetStatement: parser => option<AST.statement> = p => {
     let token = p.curToken
     if !(p->expectPeek(Token.Ident)) {
       None
@@ -246,7 +247,7 @@ module Parser: {
     }
   }
 
-  let parseReturnStatement: parser => option<AST.statement> = p => {
+  and parseReturnStatement: parser => option<AST.statement> = p => {
     let token = p.curToken
     p->nextToken
     let returnValue = p->parseExpression(Lowest)
@@ -258,7 +259,7 @@ module Parser: {
     Some(AST.ReturnStatement({token, returnValue}))
   }
 
-  let parseExpressionStatement: parser => option<AST.statement> = p => {
+  and parseExpressionStatement: parser => option<AST.statement> = p => {
     let token = p.curToken
     let expression = p->parseExpression(Lowest)
 
@@ -269,11 +270,56 @@ module Parser: {
     Some(AST.ExpressionStatement({token, expression}))
   }
 
-  let parseStatement = (p: parser) => {
+  and parseStatement = (p: parser) => {
     switch p.curToken.token_type {
     | Token.Let => p->parseLetStatement
     | Token.Return => p->parseReturnStatement
     | _ => p->parseExpressionStatement
+    }
+  }
+  and parseBlockStatement: parser => AST.blockStatement = p => {
+    let token = p.curToken
+    let statements: array<option<AST.statement>> = []
+    p->nextToken
+    while !(p->curTokenIs(Token.RBrace)) && !(p->curTokenIs(Token.EOF)) {
+      let statement = p->parseStatement
+      statement->Option.forEach(st => statements->Array.push(Some(st)))
+      p->nextToken
+    }
+    {token, statements: Some(statements)}
+  }
+  and parseIfExpression = (p: parser) => {
+    let token = p.curToken
+    if !(p->expectPeek(Token.LParen)) {
+      None
+    } else {
+      p->nextToken
+      let condition = p->parseExpression(Lowest)
+
+      if !(p->expectPeek(Token.RParen)) {
+        None
+      } else if !(p->expectPeek(Token.LBrace)) {
+        None
+      } else {
+        let consequence = p->parseBlockStatement
+        let earlyReturn = ref(false)
+        let alternative = if p->peekTokenIs(Token.Else) {
+          p->nextToken
+          if !(p->expectPeek(Token.LBrace)) {
+            earlyReturn := true
+            None
+          } else {
+            Some(p->parseBlockStatement)
+          }
+        } else {
+          None
+        }
+        if earlyReturn.contents {
+          None
+        } else {
+          Some(AST.IfExpression({token, condition, consequence: Some(consequence), alternative}))
+        }
+      }
     }
   }
 
