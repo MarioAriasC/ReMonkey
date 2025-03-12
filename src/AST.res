@@ -21,6 +21,7 @@ type rec statement =
   | IndexExpression(indexExpression)
   | BlockStatement(blockStatement)
   | IfExpression(ifExpression)
+  | FunctionLiteral(functionLiteral)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
 and returnStatement = {...tokenHolder, returnValue: option<statement>}
 and expressionStatement = {...tokenHolder, expression: option<statement>}
@@ -45,6 +46,11 @@ and ifExpression = {
   condition: option<statement>,
   consequence: option<blockStatement>,
   alternative: option<blockStatement>,
+}
+and functionLiteral = {
+  ...tokenHolder,
+  parameters: option<array<identifier>>,
+  body: option<blockStatement>,
 }
 
 module Statement = {
@@ -73,6 +79,10 @@ module Statement = {
         ->optionToString} ${alternative
         ->map(alt => `else ${BlockStatement(alt)->toString}`)
         ->getOr("")}`
+    | FunctionLiteral({token, parameters, body}) =>
+      `${token.literal} (${parameters
+        ->map(ps => ps->Array.map(p => Identifier(p)->toString)->Array.join(", "))
+        ->getOr("")}}) ${body->map(b => BlockStatement(b))->optionToString}`
     }
   }
   and argsToStringWithSeparator = (arguments: optionStatementArray, separator: string) => {

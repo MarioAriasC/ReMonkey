@@ -124,6 +124,27 @@ let chechIfExpression = (statement: option<AST.statement>, body: AST.ifExpressio
   })
 }
 
+let checkFunctionLiteral = (
+  statement: option<AST.statement>,
+  body: AST.functionLiteral => unit,
+) => {
+  statement->assertStatement(s => {
+    switch s {
+    | AST.FunctionLiteral(f) => body(f)
+    | _ => simpleFail(`statement ${s->AST.Statement.toString} is not FunctionLiteral`)
+    }
+  })
+}
+
+let assertBlockStatementSize = (size: int, blockStatement: option<AST.blockStatement>) => {
+  assertEqualsTyped(
+    size,
+    blockStatement
+    ->Option.flatMap(bs => bs.statements->Option.map(s => s->Array.length))
+    ->Option.getOr(-1),
+  )
+}
+
 test("Let Statements", () => {
   [
     ("let x = 5;", "x", I(5)),
@@ -315,12 +336,7 @@ test("if expression", () => {
       statement.expression,
       exp => {
         assertInfixExpression(exp.condition, S("x"), "<", S("y"))
-        assertEqualsTyped(
-          1,
-          exp.consequence
-          ->Option.flatMap(c => c.statements->Option.map(s => s->Array.length))
-          ->Option.getOr(-1),
-        )
+        assertBlockStatementSize(1, exp.consequence)
         let maybeStatement =
           exp.consequence->Option.flatMap(c => c.statements->Option.flatMap(s => s[0]))
         maybeStatement->Option.forEach(
@@ -347,12 +363,7 @@ test("if else expression", () => {
       statement.expression,
       exp => {
         assertInfixExpression(exp.condition, S("x"), "<", S("y"))
-        assertEqualsTyped(
-          1,
-          exp.consequence
-          ->Option.flatMap(c => c.statements->Option.map(s => s->Array.length))
-          ->Option.getOr(-1),
-        )
+        assertBlockStatementSize(1, exp.consequence)
 
         let maybeConsequenceStatement =
           exp.consequence->Option.flatMap(c => c.statements->Option.flatMap(s => s[0]))
@@ -375,6 +386,43 @@ test("if else expression", () => {
               statement,
               alternative => {
                 assertIdentifier(alternative.expression, "y")
+              },
+            )
+          },
+        )
+      },
+    )
+  })
+})
+
+test("function literal parsing", () => {
+  let input = "fn(x, y) { x + y;}"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+
+  checkExpressionStatement(program.statements[0], statement => {
+    checkFunctionLiteral(
+      statement.expression,
+      fun => {
+        switch fun.parameters {
+        | None =>
+          simpleFail(`${AST.FunctionLiteral(fun)->AST.Statement.toString} should have parameters`)
+        | Some(parameters) => {
+            let assertParameter = (parameter, value) => {
+              parameter->Option.map(p => AST.Identifier(p))->assertLiteralExpression(S(value))
+            }
+            assertParameter(parameters[0], "x")
+            assertParameter(parameters[1], "y")
+          }
+        }
+        assertBlockStatementSize(1, fun.body)
+        let maybeBody = fun.body->Option.flatMap(b => b.statements->Option.flatMap(s => s[0]))
+        maybeBody->Option.forEach(
+          statement => {
+            checkExpressionStatement(
+              statement,
+              body => {
+                assertInfixExpression(body.expression, S("x"), "+", S("y"))
               },
             )
           },

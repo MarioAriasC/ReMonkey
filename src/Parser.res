@@ -147,6 +147,7 @@ module Parser: {
     | Token.LParen => Some(parseGroupExpression)
     | Token.LBracket => Some(parseArrayLiteral)
     | Token.If => Some(parseIfExpression)
+    | Token.Function => Some(parseFunctionLiteral)
     | _ => None
     }
   }
@@ -319,6 +320,47 @@ module Parser: {
         } else {
           Some(AST.IfExpression({token, condition, consequence: Some(consequence), alternative}))
         }
+      }
+    }
+  }
+  and parserFunctionParameters = (p: parser) => {
+    let parameters: array<AST.identifier> = []
+
+    if p->peekTokenIs(Token.RParen) {
+      p->nextToken
+      Some(parameters)
+    } else {
+      p->nextToken
+      let token = p.curToken
+
+      parameters->Array.push({token, value: token.literal})
+
+      while p->peekTokenIs(Token.Comma) {
+        p->nextToken
+        p->nextToken
+
+        let innerToken = p.curToken
+        parameters->Array.push({token: innerToken, value: innerToken.literal})
+      }
+      if !(p->expectPeek(Token.RParen)) {
+        None
+      } else {
+        Some(parameters)
+      }
+    }
+  }
+  and parseFunctionLiteral = (p: parser) => {
+    let token = p.curToken
+    if !(p->expectPeek(Token.LParen)) {
+      None
+    } else {
+      let parameters = p->parserFunctionParameters
+
+      if !(p->expectPeek(Token.LBrace)) {
+        None
+      } else {
+        let body = p->parseBlockStatement
+        Some(AST.FunctionLiteral({token, parameters, body: Some(body)}))
       }
     }
   }
