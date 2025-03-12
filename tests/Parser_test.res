@@ -431,3 +431,39 @@ test("function literal parsing", () => {
     )
   })
 })
+
+test("function parameter parsing", () => {
+  [
+    ("fn() {}", []),
+    ("fn(x) {}", ["x"]),
+    ("fn(x, y, z) {}", ["x", "y", "z"]),
+  ]->Array.forEach(row => {
+    let (input, expectedParams) = row
+    let program = createProgram(input)
+    checkExpressionStatement(
+      program.statements[0],
+      statement => {
+        checkFunctionLiteral(
+          statement.expression,
+          fun => {
+            assertEqualsTyped(
+              Array.length(expectedParams),
+              fun.parameters->Option.map(p => p->Array.length)->Option.getOr(-1),
+            )
+            expectedParams->Array.forEachWithIndex(
+              (param, i) => {
+                fun.parameters->Option.forEach(
+                  parameters => {
+                    parameters[i]
+                    ->Option.map(p => AST.Identifier(p))
+                    ->assertLiteralExpression(S(param))
+                  },
+                )
+              },
+            )
+          },
+        )
+      },
+    )
+  })
+})
