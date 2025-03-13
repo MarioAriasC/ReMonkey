@@ -467,3 +467,31 @@ test("function parameter parsing", () => {
     )
   })
 })
+
+test("call expression parsing", () => {
+  let input = "add(1, 2 * 3, 4+5)"
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    assertStatement(
+      statement.expression,
+      exp => {
+        switch exp {
+        | AST.CallExpression({function, arguments}) => {
+            assertIdentifier(function, "add")
+            Option.forEach(
+              arguments,
+              args => {
+                assertEqualsTyped(3, Array.length(args))
+                assertLiteralExpression(args->getUnsafe(0), I(1))
+                assertInfixExpression(args->getUnsafe(1), I(2), "*", I(3))
+                assertInfixExpression(args->getUnsafe(2), I(4), "+", I(5))
+              },
+            )
+          }
+        | _ => simpleFail(`expression is not a CallExpression`)
+        }
+      },
+    )
+  })
+})
