@@ -85,6 +85,10 @@ module Parser: {
     AST.Identifier({token: p.curToken, value: p.curToken.literal}),
   )
 
+  let parseStringLiteral = (p: parser) => Some(
+    AST.StringLiteral({token: p.curToken, value: p.curToken.literal}),
+  )
+
   let findPrecedence = (tt: Token.tokenType) => {
     switch tt {
     | Token.Eq => Equals
@@ -148,6 +152,7 @@ module Parser: {
     | Token.LBracket => Some(parseArrayLiteral)
     | Token.If => Some(parseIfExpression)
     | Token.Function => Some(parseFunctionLiteral)
+    | Token.String => Some(parseStringLiteral)
     | _ => None
     }
   }

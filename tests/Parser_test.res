@@ -145,6 +145,15 @@ let assertBlockStatementSize = (size: int, blockStatement: option<AST.blockState
   )
 }
 
+let checkStringLiteral = (statement: option<AST.statement>, body: AST.stringLiteral => unit) => {
+  statement->assertStatement(s => {
+    switch s {
+    | AST.StringLiteral(sl) => body(sl)
+    | _ => simpleFail(`statement ${s->AST.Statement.toString} is not StringLiteral`)
+    }
+  })
+}
+
 test("Let Statements", () => {
   [
     ("let x = 5;", "x", I(5)),
@@ -491,6 +500,20 @@ test("call expression parsing", () => {
           }
         | _ => simpleFail(`expression is not a CallExpression`)
         }
+      },
+    )
+  })
+})
+
+test("string literal expression", () => {
+  let input = `"hello world";`
+  let program = createProgram(input)
+  assertCountStatements(1, program)
+  checkExpressionStatement(program.statements[0], statement => {
+    checkStringLiteral(
+      statement.expression,
+      expression => {
+        assertEqualsTyped(expression.value, "hello world")
       },
     )
   })
