@@ -542,3 +542,20 @@ test("parsing array literal", () => {
     )
   })
 })
+
+test("parsing index expression", () => {
+  let input = "myArray[1 + 1]"
+  let program = createProgram(input)
+  program.statements[0]->checkExpressionStatement(statement => {
+    let expression = statement.expression
+    assertStatement(
+      expression,
+      index => {
+        switch index {
+        | AST.IndexExpression(i) => assertIdentifier(i.left, "myArray")
+        | _ => simpleFail("Expression is not an IndexExpression")
+        }
+      },
+    )
+  })
+})
