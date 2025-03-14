@@ -22,6 +22,7 @@ type rec statement =
   | BlockStatement(blockStatement)
   | IfExpression(ifExpression)
   | FunctionLiteral(functionLiteral)
+  | HashLiteral(hashLiteral)
 and letStatement = {...tokenHolder, name: identifier, value: option<statement>}
 and returnStatement = {...tokenHolder, returnValue: option<statement>}
 and expressionStatement = {...tokenHolder, expression: option<statement>}
@@ -52,6 +53,7 @@ and functionLiteral = {
   parameters: option<array<identifier>>,
   body: option<blockStatement>,
 }
+and hashLiteral = {...tokenHolder, pairs: Map.t<statement, statement>}
 
 module Statement = {
   let rec toString: statement => string = s => {
@@ -83,6 +85,13 @@ module Statement = {
       `${token.literal} (${parameters
         ->map(ps => ps->Array.map(p => Identifier(p)->toString)->Array.join(", "))
         ->getOr("")}}) ${body->map(b => BlockStatement(b))->optionToString}`
+    | HashLiteral({pairs}) =>
+      `{${pairs
+        ->Map.keys
+        ->Core__Iterator.toArrayWithMapper(k =>
+          `${k->toString}:${pairs->Map.get(k)->optionToString}`
+        )
+        ->Array.join(", ")}}`
     }
   }
   and argsToStringWithSeparator = (arguments: optionStatementArray, separator: string) => {

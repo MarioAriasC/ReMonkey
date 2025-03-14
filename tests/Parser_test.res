@@ -559,3 +559,35 @@ test("parsing index expression", () => {
     )
   })
 })
+
+test("hash literal string keys", () => {
+  let input = `{"one": 1, "two": 2, "three": 3}`
+  let program = createProgram(input)
+  program.statements[0]->checkExpressionStatement(statement => {
+    let expression = statement.expression
+    assertStatement(
+      expression,
+      hash => {
+        switch hash {
+        | AST.HashLiteral({pairs}) => {
+            assertEqualsTyped(3, Map.size(pairs))
+            let expected = Map.fromArray([("one", 1), ("two", 2), ("three", 3)])
+            pairs->Map.forEachWithKey(
+              (value, key) => {
+                checkStringLiteral(
+                  Some(key),
+                  literal => {
+                    let expectedValue =
+                      expected->Map.get(AST.StringLiteral(literal)->AST.Statement.toString)
+                    assertLiteralExpression(Some(value), I(expectedValue->Option.getUnsafe))
+                  },
+                )
+              },
+            )
+          }
+        | _ => simpleFail("Expression is not a HashLiteral")
+        }
+      },
+    )
+  })
+})

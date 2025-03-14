@@ -153,6 +153,7 @@ module Parser: {
     | Token.If => Some(parseIfExpression)
     | Token.Function => Some(parseFunctionLiteral)
     | Token.String => Some(parseStringLiteral)
+    | Token.LBrace => Some(parseHashLiteral)
     | _ => None
     }
   }
@@ -367,6 +368,32 @@ module Parser: {
         let body = p->parseBlockStatement
         Some(AST.FunctionLiteral({token, parameters, body: Some(body)}))
       }
+    }
+  }
+  and parseHashLiteral = (p: parser) => {
+    let token = p.curToken
+    let pairs: Map.t<AST.statement, AST.statement> = Map.make()
+    let earlyReturn = ref(false)
+    while !earlyReturn.contents && !(p->peekTokenIs(Token.RBrace)) {
+      p->nextToken
+      let key = p->parseExpression(Lowest)
+      if !(p->expectPeek(Token.Colon)) {
+        earlyReturn := true
+      } else {
+        p->nextToken
+        let value = p->parseExpression(Lowest)
+        pairs->Map.set(key->Option.getUnsafe, value->Option.getUnsafe)
+        if !(p->peekTokenIs(Token.RBrace)) && !(p->expectPeek(Token.Comma)) {
+          earlyReturn := true
+        }
+      }
+    }
+    if earlyReturn.contents {
+      None
+    } else if !(p->expectPeek(Token.RBrace)) {
+      None
+    } else {
+      Some(AST.HashLiteral({token, pairs}))
     }
   }
 
