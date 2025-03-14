@@ -518,3 +518,27 @@ test("string literal expression", () => {
     )
   })
 })
+
+test("parsing array literal", () => {
+  let input = "[1, 2*2, 3   +    3    ]"
+  let program = createProgram(input)
+  checkExpressionStatement(program.statements[0], statement => {
+    let expression = statement.expression
+    assertStatement(
+      expression,
+      al => {
+        switch al {
+        | AST.ArrayLiteral(arrayLiteral) =>
+          arrayLiteral.elements->Option.forEach(
+            elements => {
+              assertIntegerLiteral(elements->getUnsafe(0), 1)
+              assertInfixExpression(elements->getUnsafe(1), I(2), "*", I(2))
+              assertInfixExpression(elements->getUnsafe(2), I(3), "+", I(3))
+            },
+          )
+        | _ => simpleFail("Expression is not a ArrayLiteral")
+        }
+      },
+    )
+  })
+})
