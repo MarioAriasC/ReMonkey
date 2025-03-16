@@ -2,13 +2,6 @@ open Test
 open Asserts
 open Array
 
-type testParam =
-  | I(int)
-  | B(bool)
-  | S(string)
-
-let simpleFail = (m: string) => fail(~message=m, ())
-
 let createProgram = (input: string) => {
   let lexer = Lexer.Lexer.newLexer(input)
   let parser = Parser.Parser.newParser(lexer)
@@ -82,6 +75,7 @@ let assertLiteralExpression = (value: option<AST.statement>, expectedValue: test
   | I(i) => assertIntegerLiteral(value, i)
   | B(b) => assertBooleanLiteral(value, b)
   | S(s) => assertIdentifier(value, s)
+  | N => ()
   }
 }
 
