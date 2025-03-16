@@ -28,11 +28,28 @@ let assertInt = (obj: option<mObject>, expected: int) => {
   })
 }
 
+let assertBool = (obj: option<mObject>, expected: bool) => {
+  assertObject(obj, o => {
+    switch o {
+    | Objects.MBoolean({value}) => assertEqualsTyped(value, expected)
+    | _ => simpleFail(`object is not MBoolean, got ${o->typeDesc}, (${o->toString})`)
+    }
+  })
+}
+
 let assertInts = (tests: array<(string, int)>) => {
   Array.forEach(tests, row => {
     let (input, expected) = row
     let evaluated = testEval(input)
     assertInt(evaluated, expected)
+  })
+}
+
+let assertBools = (tests: array<(string, bool)>) => {
+  Array.forEach(tests, row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    assertBool(evaluated, expected)
   })
 }
 
@@ -54,4 +71,28 @@ test("eval integer expression", () => {
     ("3 * (3 * 3) + 10", 37),
     ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
   ]->assertInts
+})
+
+test("eval boolean expression", () => {
+  [
+    ("true", true),
+    ("false", false),
+    ("1 < 2", true),
+    ("1 > 2", false),
+    ("1 < 1", false),
+    ("1 > 1", false),
+    ("1 == 1", true),
+    ("1 != 1", false),
+    ("1 == 2", false),
+    ("1 != 2", true),
+    ("true == true", true),
+    ("false == false", true),
+    ("true == false", false),
+    ("true != false", true),
+    ("false != true", true),
+    ("(1 < 2) == true", true),
+    ("(1 < 2) == false", false),
+    ("(1 > 2) == true", false),
+    ("(1 > 2) == false", true),
+  ]->assertBools
 })

@@ -33,6 +33,16 @@ module Environment = {
 module Eval: {
   let eval: (AST.program, Environment.environment) => option<mObject>
 } = {
+  let cTRUE = MBoolean({value: true})
+  let cFALSE = MBoolean({value: false})
+
+  let boolToMonkey = (b: bool) =>
+    if b {
+      cTRUE
+    } else {
+      cFALSE
+    }
+
   let ifNotError = (obj: option<mObject>, body: mObject => option<mObject>) => {
     obj->Option.flatMap(o => {
       switch o {
@@ -61,6 +71,10 @@ module Eval: {
     | "-" => MInteger({value: left - right})
     | "*" => MInteger({value: left * right})
     | "/" => MInteger({value: left / right})
+    | "<" => (left < right)->boolToMonkey
+    | ">" => (left > right)->boolToMonkey
+    | "==" => (left == right)->boolToMonkey
+    | "!=" => (left != right)->boolToMonkey
     | _ => MError({message: `unknown operator MInteger ${operator} MInteger`})
     }
   }
@@ -69,6 +83,8 @@ module Eval: {
     switch (left, operator, right) {
     | (MInteger({value: leftValue}), _, MInteger({value: rightValue})) =>
       evalIntegerInfixExpression(operator, leftValue, rightValue)
+    | (_, "==", _) => (left == right)->boolToMonkey
+    | (_, "!=", _) => (left != right)->boolToMonkey
     | _ => MError({message: `unknown operator: ${left->typeDesc} ${operator} ${left->typeDesc}`})
     }->Some
   }
@@ -114,6 +130,7 @@ module Eval: {
           | _ => Some(MError({message: `Unknown operator: ${operator}${r->typeDesc}`}))
           }
         })
+      | AST.BooleanLiteral({value}) => Some(value->boolToMonkey)
       | _ => {
           Js.log(%raw("statement.TAG"))
           None
