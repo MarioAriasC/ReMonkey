@@ -32,9 +32,11 @@ module Environment = {
 
 module Eval: {
   let eval: (AST.program, Environment.environment) => option<mObject>
+  let cNULL: mObject
 } = {
   let cTRUE = MBoolean({value: true})
   let cFALSE = MBoolean({value: false})
+  let cNULL = MNull
 
   let boolToMonkey = (b: bool) =>
     if b {
@@ -89,6 +91,18 @@ module Eval: {
     }->Some
   }
 
+  let evalBangOperatorExpression = (obj: mObject) => {
+    if obj == cTRUE {
+      cFALSE
+    } else if obj == cFALSE {
+      cTRUE
+    } else if obj == cNULL {
+      cTRUE
+    } else {
+      cFALSE
+    }->Some
+  }
+
   let rec eval = (program: AST.program, env: Environment.environment) => {
     let result: ref<option<mObject>> = ref(None)
     let keep = ref(true)
@@ -121,11 +135,30 @@ module Eval: {
             evalInfixExpression(operator, l, r)
           })
         })
+      | AST.BlockStatement(block) => evaluateBlockStatement(block, env)
       | AST.ExpressionStatement({expression}) => evaluateStatement(expression, env)
+      | AST.IfExpression({condition, consequence, alternative}) => {
+          let isTruthy = (c: mObject) => {
+            if c == cNULL || c == cFALSE {
+              false
+            } else {
+              true
+            }
+          }
+          evaluateStatement(condition, env)->ifNotError(c => {
+            if isTruthy(c) {
+              evaluateStatement(consequence->Option.map(b => AST.BlockStatement(b)), env)
+            } else if alternative->Option.isSome {
+              evaluateBlockStatement(alternative->Option.getUnsafe, env)
+            } else {
+              Some(cNULL)
+            }
+          })
+        }
       | AST.PrefixExpression({operator, right}) =>
         ifNotError(evaluateStatement(right, env), r => {
           switch operator {
-          // | "!" => evalBangOperatorExpression(r)
+          | "!" => evalBangOperatorExpression(r)
           | "-" => evalMinusPrefixOperatorExpression(r)
           | _ => Some(MError({message: `Unknown operator: ${operator}${r->typeDesc}`}))
           }
@@ -138,5 +171,26 @@ module Eval: {
       }
     | None => raise(Failure("statement shouldn't be None"))
     }
+  }
+  and evaluateBlockStatement = (st: AST.blockStatement, env: Environment.environment) => {
+    let result: ref<option<mObject>> = ref(None)
+    let keep = ref(true)
+    st.statements->Option.forEach(statements => {
+      statements->Array.forEach(statement => {
+        if keep.contents {
+          result := evaluateStatement(statement, env)
+          result.contents->Option.forEach(
+            contents => {
+              switch contents {
+              | MReturnValue(_) => keep := false
+              | MError(_) => keep := false
+              | _ => ()
+              }
+            },
+          )
+        }
+      })
+    })
+    result.contents
   }
 }

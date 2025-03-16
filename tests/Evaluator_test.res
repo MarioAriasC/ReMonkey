@@ -96,3 +96,33 @@ test("eval boolean expression", () => {
     ("(1 > 2) == false", true),
   ]->assertBools
 })
+
+test("bang operator", () => {
+  [
+    ("!true", false),
+    ("!false", true),
+    ("!5", false),
+    ("!!true", true),
+    ("!!false", false),
+    ("!!5", true),
+  ]->assertBools
+})
+
+test("if else expression", () => {
+  [
+    ("if (true) { 10 }", Some(10)),
+    ("if (false) { 10 }", None),
+    ("if (1) { 10 }", Some(10)),
+    ("if (1 < 2) { 10 }", Some(10)),
+    ("if (1 > 2) { 10 }", None),
+    ("if (1 > 2) { 10 } else { 20 }", Some(20)),
+    ("if (1 < 2) { 10 } else { 20 }", Some(10)),
+  ]->Array.forEach(row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    switch expected {
+    | Some(i) => assertInt(evaluated, i)
+    | None => assertEqualsTyped(evaluated->Option.getUnsafe, Evaluator.Eval.cNULL)
+    }
+  })
+})

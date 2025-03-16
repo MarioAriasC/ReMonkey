@@ -8,6 +8,7 @@ type rec mObject =
   | MReturnValue(mReturnValue)
   | MBoolean(mBoolean)
   | MError(mError)
+  | MNull
 and mReturnValue = {value: mObject}
 
 let rec inspect = (o: mObject) => {
@@ -16,6 +17,7 @@ let rec inspect = (o: mObject) => {
   | MBoolean({value}) => String.make(value)
   | MReturnValue({value}) => value->inspect
   | MError({message}) => `ERROR: ${message}`
+  | MNull => "null"
   }
 }
 
@@ -25,6 +27,7 @@ let rec toString = (o: mObject) => {
   | MBoolean({value}) => `MBoolean(value=${String.make(value)})`
   | MReturnValue({value}) => `MReturn(value=${value->toString})`
   | MError({message}) => `MError(message=${message})`
+  | MNull => "MNull"
   }
 }
 
