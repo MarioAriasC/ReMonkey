@@ -1,37 +1,7 @@
 open Objects
 
-module Environment = {
-  type rec environment = {store: Map.t<string, mObject>, outer: option<environment>}
-
-  let newEnvironment: unit => environment = () => {
-    {store: Map.make(), outer: None}
-  }
-
-  let newEnclosedEnvironment: environment => environment = env => {
-    {store: Map.make(), outer: Some(env)}
-  }
-
-  let set = (env: environment, name: string, value: mObject) => {
-    env.store->Map.set(name, value)
-  }
-
-  let put = (env: environment, name: string, value: mObject) => {
-    env->set(name, value)
-    env
-  }
-
-  let rec get = (env: environment, name: string) => {
-    let obj = env.store->Map.get(name)
-    if obj->Option.isNone && env.outer->Option.isSome {
-      env.outer->Option.getUnsafe->get(name)
-    } else {
-      obj
-    }
-  }
-}
-
 module Eval: {
-  let eval: (AST.program, Environment.environment) => option<mObject>
+  let eval: (AST.program, environment) => option<mObject>
   let cNULL: mObject
 } = {
   let cTRUE = MBoolean({value: true})
@@ -54,10 +24,14 @@ module Eval: {
     })
   }
 
-  let notNone = (obj: option<mObject>, body: mObject => option<mObject>) => {
+  let isError = (obj: option<mObject>) => {
     switch obj {
-    | Some(o) => body(o)
-    | None => Some(MError({message: "obj is None"}))
+    | Some(o) =>
+      switch o {
+      | MError(_) => true
+      | _ => false
+      }
+    | None => false
     }
   }
 
@@ -103,7 +77,17 @@ module Eval: {
     }->Some
   }
 
-  let rec eval = (program: AST.program, env: Environment.environment) => {
+  let extendFunctionEnv = (fun: mFunction, args: array<option<mObject>>) => {
+    let env = Environment.newEnclosedEnvironment(fun.env)
+    fun.parameters->Option.forEach(params => {
+      params->Array.forEachWithIndex((identifier, i) => {
+        env->Environment.set(identifier.value, args->Array.getUnsafe(i)->Option.getUnsafe)
+      })
+    })
+    env
+  }
+
+  let rec eval = (program: AST.program, env: environment) => {
     let result: ref<option<mObject>> = ref(None)
     let keep = ref(true)
     program.statements->Array.forEach(statement => {
@@ -124,10 +108,14 @@ module Eval: {
     })
     result.contents
   }
-  and evaluateStatement = (statement: option<AST.statement>, env: Environment.environment) => {
+  and evaluateStatement = (statement: option<AST.statement>, env: environment) => {
     switch statement {
     | Some(st) =>
       switch st {
+      | AST.Identifier({value}) => {
+          let v = env->Environment.get(value)
+          v
+        }
       | AST.IntegerLiteral(i) => Some(Objects.MInteger({value: i.value}))
       | AST.InfixExpression({left, operator, right}) =>
         ifNotError(evaluateStatement(left, env), l => {
@@ -155,6 +143,19 @@ module Eval: {
             }
           })
         }
+      | AST.CallExpression({function, arguments}) =>
+        evaluateStatement(function, env)->ifNotError(fun => {
+          let args = evalExpressions(arguments, env)
+          if Array.length(args) == 1 && isError(args[0]->Option.getUnsafe) {
+            args[0]->Option.getUnsafe
+          } else {
+            applyFunction(fun, args)
+          }
+        })
+      | AST.ReturnStatement({returnValue}) =>
+        evaluateStatement(returnValue, env)->ifNotError(value => {
+          Some(MReturnValue({value: value}))
+        })
       | AST.PrefixExpression({operator, right}) =>
         ifNotError(evaluateStatement(right, env), r => {
           switch operator {
@@ -164,6 +165,11 @@ module Eval: {
           }
         })
       | AST.BooleanLiteral({value}) => Some(value->boolToMonkey)
+      | AST.LetStatement({name, value}) =>
+        evaluateStatement(value, env)->ifNotError(v => {
+          Some(env->Environment.put(name.value, v))
+        })
+      | AST.FunctionLiteral({parameters, body}) => Some(MFunction({parameters, body, env}))
       | _ => {
           Js.log(%raw("statement.TAG"))
           None
@@ -172,7 +178,7 @@ module Eval: {
     | None => raise(Failure("statement shouldn't be None"))
     }
   }
-  and evaluateBlockStatement = (st: AST.blockStatement, env: Environment.environment) => {
+  and evaluateBlockStatement = (st: AST.blockStatement, env: environment) => {
     let result: ref<option<mObject>> = ref(None)
     let keep = ref(true)
     st.statements->Option.forEach(statements => {
@@ -192,5 +198,47 @@ module Eval: {
       })
     })
     result.contents
+  }
+  and evalExpressions: (AST.optionStatementArray, environment) => array<option<mObject>> = (
+    args: AST.optionStatementArray,
+    env: environment,
+  ) => {
+    let evalList: ref<array<option<mObject>>> = ref([])
+    let keep = ref(true)
+    args->Option.forEach(arguments => {
+      arguments->Array.forEach(arg => {
+        if keep.contents {
+          let evaluated = evaluateStatement(arg, env)
+          if isError(evaluated) {
+            keep := false
+            evalList := [evaluated]
+          } else {
+            let evalListContents = evalList.contents
+            evalListContents->Array.push(evaluated)
+            evalList := evalListContents
+          }
+        }
+      })
+    })
+    evalList.contents
+  }
+  and applyFunction = (fun: mObject, args: array<option<mObject>>) => {
+    switch fun {
+    | MFunction(mFun) => {
+        let extendEnv = extendFunctionEnv(mFun, args)
+        let evaluated = evaluateStatement(
+          mFun.body->Option.map(body => AST.BlockStatement(body)),
+          extendEnv,
+        )
+
+        evaluated->Option.map(eval => {
+          switch eval {
+          | MReturnValue({value}) => value
+          | _ => eval
+          }
+        })
+      }
+    | _ => Some(MError({message: `Not a function: ${fun->typeDesc}`}))
+    }
   }
 }
