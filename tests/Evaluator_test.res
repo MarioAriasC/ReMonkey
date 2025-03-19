@@ -162,3 +162,21 @@ test("return statements", () => {
     ),
   ]->assertInts
 })
+
+test("recursive fibonacci", () => {
+  let input = `let fibonacci = fn(x) {
+    if (x == 0) {
+        return 0;
+    } else {
+        if (x == 1) {
+            return 1;
+        } else {
+            fibonacci(x - 1) + fibonacci(x - 2);
+        }
+    }
+};
+    fibonacci(15);`
+
+  let evaluated = testEval(input)
+  assertInt(evaluated, 610)
+})
