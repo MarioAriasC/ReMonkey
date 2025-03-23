@@ -219,3 +219,12 @@ test("error handling", () => {
     assertError(evaluated, expected)
   })
 })
+
+test("let statement", () => {
+  [
+    ("let a = 5; a;", 5),
+    ("let a = 5 * 5; a;", 25),
+    ("let a = 5; let b = a; b;", 5),
+    ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
+  ]->assertInts
+})
