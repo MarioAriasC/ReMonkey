@@ -53,6 +53,15 @@ let assertBools = (tests: array<(string, bool)>) => {
   })
 }
 
+let assertError = (obj: option<mObject>, expected: string) => {
+  assertObject(obj, o => {
+    switch o {
+    | Objects.MError({message}) => assertEqualsTyped(message, expected)
+    | _ => simpleFail(`object is not a MError, got ${o->typeDesc}`)
+    }
+  })
+}
+
 test("eval integer expression", () => {
   [
     ("5", 5),
@@ -179,4 +188,34 @@ test("recursive fibonacci", () => {
 
   let evaluated = testEval(input)
   assertInt(evaluated, 610)
+})
+
+test("error handling", () => {
+  [
+    ("5 + true", "type mismatch: MInteger + MBoolean"),
+    ("5 + true; 5;", "type mismatch: MInteger + MBoolean"),
+    ("-true", "unknown operator: -MBoolean"),
+    ("true + false;", "unknown operator: MBoolean + MBoolean"),
+    ("true + false + true + false;", "unknown operator: MBoolean + MBoolean"),
+    ("5; true + false; 5", "unknown operator: MBoolean + MBoolean"),
+    ("if (10 > 1) { true + false; }", "unknown operator: MBoolean + MBoolean"),
+    (
+      `
+                if (10 > 1) {
+                  if (10 > 1) {
+                    return true + false;
+                  }
+                
+                  return 1;
+                }`,
+      "unknown operator: MBoolean + MBoolean",
+    ),
+    ("foobar", "identifier not found: foobar"),
+    (`"Hello" - "World"`, "unknown operator: MString - MString"),
+    (`{"name": "Monkey"}[fn(x) {x}];`, "unusable as a hash key: MFunction"),
+  ]->Array.forEach(row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    assertError(evaluated, expected)
+  })
 })

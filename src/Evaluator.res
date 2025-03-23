@@ -38,7 +38,7 @@ module Eval: {
   let evalMinusPrefixOperatorExpression = (obj: mObject) =>
     switch obj {
     | MInteger({value}) => MInteger({value: -value})
-    | _ => MError({message: `unknown operator -${obj->typeDesc}`})
+    | _ => MError({message: `unknown operator: -${obj->typeDesc}`})
     }->Some
 
   let evalIntegerInfixExpression = (operator: string, left: int, right: int) => {
@@ -61,7 +61,12 @@ module Eval: {
       evalIntegerInfixExpression(operator, leftValue, rightValue)
     | (_, "==", _) => (left == right)->boolToMonkey
     | (_, "!=", _) => (left != right)->boolToMonkey
-    | _ => MError({message: `unknown operator: ${left->typeDesc} ${operator} ${left->typeDesc}`})
+    | _ =>
+      if left->typeDesc != right->typeDesc {
+        MError({message: `type mismatch: ${left->typeDesc} ${operator} ${right->typeDesc}`})
+      } else {
+        MError({message: `unknown operator: ${left->typeDesc} ${operator} ${right->typeDesc}`})
+      }
     }->Some
   }
 
@@ -85,6 +90,31 @@ module Eval: {
       })
     })
     env
+  }
+
+  let evalArrayIndexExpression = (elements: array<option<mObject>>, index: int) => {
+    let max = Array.length(elements) + 1
+    if index < 0 || index > max {
+      Some(cNULL)
+    } else {
+      elements->Array.getUnsafe(index)
+    }
+  }
+
+  let evalHashIndexExpression = (pairs: Map.t<string, hashPair>, index: option<mObject>) => {
+    switch index {
+    | Some(o) =>
+      if o->isHashable {
+        let pair = pairs->Map.get(o->hashKey)
+        switch pair {
+        | Some({value}) => Some(value)
+        | None => Some(cNULL)
+        }
+      } else {
+        Some(MError({message: `unusable as a hash key: ${o->typeDesc}`}))
+      }
+    | None => Some(MError({message: "unusable as a hash key: null"}))
+    }
   }
 
   let rec eval = (program: AST.program, env: environment) => {
@@ -114,7 +144,11 @@ module Eval: {
       switch st {
       | AST.Identifier({value}) => {
           let v = env->Environment.get(value)
-          v
+          if v->Option.isNone {
+            Some(MError({message: `identifier not found: ${value}`}))
+          } else {
+            v
+          }
         }
       | AST.IntegerLiteral(i) => Some(Objects.MInteger({value: i.value}))
       | AST.InfixExpression({left, operator, right}) =>
@@ -170,11 +204,76 @@ module Eval: {
           Some(env->Environment.put(name.value, v))
         })
       | AST.FunctionLiteral({parameters, body}) => Some(MFunction({parameters, body, env}))
+      | AST.StringLiteral({value}) => Some(MString({value: value}))
+      | AST.IndexExpression({left, index}) => {
+          let leftEvaluated = evaluateStatement(left, env)
+          if leftEvaluated->isError {
+            leftEvaluated
+          } else {
+            let indexEvaluated = evaluateStatement(index, env)
+            if indexEvaluated->isError {
+              indexEvaluated
+            } else {
+              switch (leftEvaluated, indexEvaluated) {
+              | (Some(MArray({elements})), Some(MInteger({value}))) =>
+                evalArrayIndexExpression(elements, value)
+              | (Some(MHash({pairs})), _) => evalHashIndexExpression(pairs, indexEvaluated)
+              | _ =>
+                Some(
+                  MError({
+                    message: `index operator not supported: ${leftEvaluated
+                      ->Option.map(l => l->typeDesc)
+                      ->Option.getOr("")}`,
+                  }),
+                )
+              }
+            }
+          }
+        }
+      | AST.HashLiteral({pairs}) => {
+          let bodyPairs: Map.t<string, hashPair> = Map.make()
+          let keep = ref(true)
+          let returnValue: ref<option<mObject>> = ref(None)
+          pairs->Map.forEachWithKey((value, key) => {
+            if keep.contents {
+              let keyEvaluated = evaluateStatement(Some(key), env)
+              if keyEvaluated->isError {
+                keep := false
+                returnValue := keyEvaluated
+              } else {
+                switch keyEvaluated {
+                | Some(k) =>
+                  if k->isHashable {
+                    let valueEvaluated = evaluateStatement(Some(value), env)
+                    if valueEvaluated->isError {
+                      keep := false
+                      returnValue := valueEvaluated
+                    } else {
+                      bodyPairs->Map.set(
+                        k->hashKey,
+                        {key: k, value: valueEvaluated->Option.getUnsafe},
+                      )
+                    }
+                  } else {
+                    keep := false
+                    returnValue := Some(MError({message: `unusable as a hash key: ${k->typeDesc}`}))
+                  }
+                | None => {
+                    keep := false
+                    returnValue := Some(MError({message: `unusable as a hash key: null`}))
+                  }
+                }
+              }
+            }
+          })
+          returnValue.contents->Option.getOr(MHash({pairs: bodyPairs}))->Some
+        }
       | _ => {
           Js.log(%raw("statement.TAG"))
           None
         }
       }
+
     | None => raise(Failure("statement shouldn't be None"))
     }
   }
