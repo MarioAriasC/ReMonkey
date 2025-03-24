@@ -61,6 +61,8 @@ module Eval: {
       evalIntegerInfixExpression(operator, leftValue, rightValue)
     | (_, "==", _) => (left == right)->boolToMonkey
     | (_, "!=", _) => (left != right)->boolToMonkey
+    | (MString({value: leftValue}), "+", MString({value: rightValue})) =>
+      MString({value: leftValue ++ rightValue})
     | _ =>
       if left->typeDesc != right->typeDesc {
         MError({message: `type mismatch: ${left->typeDesc} ${operator} ${right->typeDesc}`})

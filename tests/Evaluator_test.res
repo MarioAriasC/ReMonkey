@@ -62,6 +62,15 @@ let assertError = (obj: option<mObject>, expected: string) => {
   })
 }
 
+let assertString = (obj: option<mObject>, expected: string) => {
+  assertObject(obj, o => {
+    switch o {
+    | Objects.MString({value}) => assertEqualsTyped(value, expected)
+    | _ => simpleFail(`object is not a MString, got ${o->typeDesc}`)
+    }
+  })
+}
+
 test("eval integer expression", () => {
   [
     ("5", 5),
@@ -275,4 +284,14 @@ test("enclosing environments", () => {
                   ourFunction(20) + first + second;`
 
   input->testEval->assertInt(70)
+})
+
+test("string literal", () => {
+  let input = `"Hello world!"`
+  input->testEval->assertString("Hello world!")
+})
+
+test("string concatenation", () => {
+  let input = `"Hello" + " " + "world!"`
+  input->testEval->assertString("Hello world!")
 })
