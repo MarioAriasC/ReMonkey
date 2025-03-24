@@ -228,3 +228,24 @@ test("let statement", () => {
     ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
   ]->assertInts
 })
+
+test("function object", () => {
+  let input = "fn(x) {x + 2;};"
+  let evaluated = testEval(input)
+  evaluated->assertObject(f => {
+    switch f {
+    | MFunction({parameters, body}) =>
+      parameters->Option.forEach(
+        params => {
+          assertEqualsTyped(params->Array.length, 1)
+          assertEqualsTyped(AST.Identifier(params->Array.getUnsafe(0))->AST.Statement.toString, "x")
+        },
+      )
+      assertEqualsTyped(
+        AST.BlockStatement(body->Option.getUnsafe)->AST.Statement.toString,
+        "(x + 2)",
+      )
+    | _ => simpleFail(`obj is not an MFunction`)
+    }
+  })
+})
