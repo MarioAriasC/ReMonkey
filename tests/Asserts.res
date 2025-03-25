@@ -10,5 +10,6 @@ type testParam =
   | B(bool)
   | S(string)
   | N
+  | A(array<int>)
 
 let simpleFail = (m: string) => fail(~message=m, ())

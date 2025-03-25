@@ -75,7 +75,7 @@ let assertLiteralExpression = (value: option<AST.statement>, expectedValue: test
   | I(i) => assertIntegerLiteral(value, i)
   | B(b) => assertBooleanLiteral(value, b)
   | S(s) => assertIdentifier(value, s)
-  | N => ()
+  | _ => ()
   }
 }
 

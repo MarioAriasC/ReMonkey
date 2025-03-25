@@ -13,6 +13,7 @@ type rec mObject =
   | MString(mString)
   | MArray(mArray)
   | MHash(mHash)
+  | MBuiltinFunction(mBuiltinFunction)
 and mReturnValue = {value: mObject}
 and environment = {store: Map.t<string, mObject>, outer: option<environment>}
 and mFunction = {
@@ -23,6 +24,7 @@ and mFunction = {
 and mArray = {elements: array<option<mObject>>}
 and hashPair = {key: mObject, value: mObject}
 and mHash = {pairs: Map.t<string, hashPair>}
+and mBuiltinFunction = {fn: array<option<mObject>> => option<mObject>}
 
 let isHashable = (o: mObject) => {
   switch o {
@@ -66,6 +68,7 @@ let rec inspect = (o: mObject) => {
         })
       `{${values->Array.join(", ")}}`
     }
+  | MBuiltinFunction(_) => "builtin function"
   }
 }
 
@@ -80,6 +83,7 @@ and toString = (o: mObject) => {
   | MString({value}) => `MString(value=${value})`
   | MArray(_) => "MArray"
   | MHash(_) => "MHash"
+  | MBuiltinFunction(_) => "MBuiltinFunction"
   }
 }
 
@@ -95,3 +99,44 @@ let hashKey = (o: mObject) => {
   | _ => raise(Invalid_argument(`${o->typeDesc} doesn't implement hashKey`))
   }
 }
+
+let cLEN = "len"
+
+let argSizeCheck = (
+  expectedSize: int,
+  args: array<option<mObject>>,
+  body: array<option<mObject>> => option<mObject>,
+) => {
+  let length = Array.length(args)
+  if length != expectedSize {
+    Some(
+      MError({
+        message: `wrong number of arguments. got=${String.make(length)}, want=${String.make(
+            expectedSize,
+          )}`,
+      }),
+    )
+  } else {
+    body(args)
+  }
+}
+
+let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
+  (
+    cLEN,
+    {
+      fn: args =>
+        argSizeCheck(1, args, it => {
+          it
+          ->Array.getUnsafe(0)
+          ->Option.map(arg => {
+            switch arg {
+            | MString({value}) => MInteger({value: String.length(value)})
+            | MArray({elements}) => MInteger({value: Array.length(elements)})
+            | _ => MError({message: `argument to "len" not supported, got ${arg->typeDesc}`})
+            }
+          })
+        }),
+    },
+  ),
+])

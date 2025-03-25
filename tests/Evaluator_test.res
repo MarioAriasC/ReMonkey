@@ -295,3 +295,23 @@ test("string concatenation", () => {
   let input = `"Hello" + " " + "world!"`
   input->testEval->assertString("Hello world!")
 })
+
+test("builtin functions", () => {
+  [
+    (`len("")`, I(0)),
+    (`len("four")`, I(4)),
+    (`len("hello world")`, I(11)),
+    (`len(1)`, S(`argument to "len" not supported, got MInteger`)),
+    (`len("one", "two")`, S(`wrong number of arguments. got=2, want=1`)),
+    ("len([1, 2, 3])", I(3)),
+    ("len([])", I(0)),
+  ]->Array.forEach(row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    switch expected {
+    | I(value) => assertInt(evaluated, value)
+    | S(error) => assertError(evaluated, error)
+    | _ => simpleFail("not implemented")
+    }
+  })
+})

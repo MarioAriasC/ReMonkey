@@ -147,7 +147,11 @@ module Eval: {
       | AST.Identifier({value}) => {
           let v = env->Environment.get(value)
           if v->Option.isNone {
-            Some(MError({message: `identifier not found: ${value}`}))
+            let fn = builtins->Map.get(value)
+            switch fn {
+            | Some(f) => Some(MBuiltinFunction(f))
+            | None => Some(MError({message: `identifier not found: ${value}`}))
+            }
           } else {
             v
           }
@@ -270,9 +274,13 @@ module Eval: {
           })
           returnValue.contents->Option.getOr(MHash({pairs: bodyPairs}))->Some
         }
-      | _ => {
-          Js.log(%raw("statement.TAG"))
-          None
+      | AST.ArrayLiteral({elements}) => {
+          let evalElements = evalExpressions(elements, env)
+          if evalElements->Array.length == 1 && isError(evalElements->Array.getUnsafe(0)) {
+            evalElements->Array.getUnsafe(0)
+          } else {
+            Some(MArray({elements: evalElements}))
+          }
         }
       }
 
@@ -338,6 +346,14 @@ module Eval: {
           | _ => eval
           }
         })
+      }
+    | MBuiltinFunction({fn}) => {
+        let result = fn(args)
+        if result->Option.isSome {
+          result
+        } else {
+          Some(cNULL)
+        }
       }
     | _ => Some(MError({message: `Not a function: ${fun->typeDesc}`}))
     }
