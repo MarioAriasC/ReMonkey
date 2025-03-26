@@ -57,7 +57,7 @@ let rec inspect = (o: mObject) => {
   | MString({value}) => value
   | MArray({elements}) =>
     `[${elements
-      ->Array.map(elem => elem->Option.map(o => o->inspect)->Option.getOr(""))
+      ->Array.map(elem => elem->Option.map(inspect)->Option.getOr(""))
       ->Array.join(", ")}]`
   | MHash({pairs}) => {
       let values =
@@ -101,7 +101,7 @@ let hashKey = (o: mObject) => {
 }
 
 let cLEN = "len"
-
+let cPUSH = "push"
 let argSizeCheck = (
   expectedSize: int,
   args: array<option<mObject>>,
@@ -121,6 +121,22 @@ let argSizeCheck = (
   }
 }
 
+let arrayCheck = (
+  name: string,
+  args: array<option<mObject>>,
+  body: (mArray, int) => option<mObject>,
+) => {
+  let first = args->Array.getUnsafe(0)
+  switch first {
+  | Some(f) =>
+    switch f {
+    | MArray(arr) => body(arr, arr.elements->Array.length)
+    | _ => Some(MError({message: `argument to "${name}" must be ARRAY, got ${f->typeDesc}`}))
+    }
+  | None => Some(MError({message: `argument to "${name}" must be ARRAY, got null`}))
+  }
+}
+
 let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
   (
     cLEN,
@@ -137,6 +153,22 @@ let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
             }
           })
         }),
+    },
+  ),
+  (
+    cPUSH,
+    {
+      fn: args => {
+        argSizeCheck(2, args, it => {
+          arrayCheck(cPUSH, it, (arr, _) => {
+            let elements = arr.elements
+            // %raw("console.dir(args)")
+            elements->Array.push(args->Array.getUnsafe(1))
+            // %raw("console.dir(elements)")
+            Some(MArray({elements: elements}))
+          })
+        })
+      },
     },
   ),
 ])

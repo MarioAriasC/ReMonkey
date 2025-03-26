@@ -23,7 +23,7 @@ let assertInt = (obj: option<mObject>, expected: int) => {
   assertObject(obj, o => {
     switch o {
     | Objects.MInteger({value}) => assertEqualsTyped(value, expected)
-    | _ => simpleFail(`object is not MInteger, got ${o->typeDesc}, (${o->toString})`)
+    | _ => simpleFail(`object is not MInteger, got ${o->typeDesc}, (${o->inspect})`)
     }
   })
 }
@@ -305,12 +305,28 @@ test("builtin functions", () => {
     (`len("one", "two")`, S(`wrong number of arguments. got=2, want=1`)),
     ("len([1, 2, 3])", I(3)),
     ("len([])", I(0)),
+    ("push([], 1)", A([1])),
+    ("push(1,1)", S(`argument to "push" must be ARRAY, got MInteger`)),
   ]->Array.forEach(row => {
     let (input, expected) = row
     let evaluated = testEval(input)
     switch expected {
     | I(value) => assertInt(evaluated, value)
     | S(error) => assertError(evaluated, error)
+    | A(arr) =>
+      evaluated->assertObject(
+        a => {
+          switch a {
+          | MArray({elements}) =>
+            arr->Array.forEachWithIndex(
+              (element, i) => {
+                assertInt(elements->Array.getUnsafe(i), element)
+              },
+            )
+          | _ => simpleFail(`object is not MArray, got=${a->typeDesc} (${a->toString})`)
+          }
+        },
+      )
     | _ => simpleFail("not implemented")
     }
   })
