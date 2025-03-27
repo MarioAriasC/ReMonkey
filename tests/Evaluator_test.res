@@ -307,6 +307,9 @@ test("builtin functions", () => {
     ("len([])", I(0)),
     ("push([], 1)", A([1])),
     ("push(1,1)", S(`argument to "push" must be ARRAY, got MInteger`)),
+    ("first([1, 2, 3])", I(1)),
+    ("first([])", N),
+    ("first(1)", S(`argument to "first" must be ARRAY, got MInteger`)),
   ]->Array.forEach(row => {
     let (input, expected) = row
     let evaluated = testEval(input)
@@ -327,6 +330,7 @@ test("builtin functions", () => {
           }
         },
       )
+    | N => assertEqualsTyped(evaluated, Some(Evaluator.Eval.cNULL))
     | _ => simpleFail("not implemented")
     }
   })
