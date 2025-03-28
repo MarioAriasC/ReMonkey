@@ -103,6 +103,7 @@ let hashKey = (o: mObject) => {
 let cLEN = "len"
 let cPUSH = "push"
 let cFIRST = "first"
+let cLAST = "last"
 let argSizeCheck = (
   expectedSize: int,
   args: array<option<mObject>>,
@@ -180,6 +181,22 @@ let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
           arrayCheck(cFIRST, it, (arr, length) => {
             if length > 0 {
               arr.elements->Array.getUnsafe(0)
+            } else {
+              None
+            }
+          })
+        })
+      },
+    },
+  ),
+  (
+    cLAST,
+    {
+      fn: args => {
+        argSizeCheck(1, args, it => {
+          arrayCheck(cLAST, it, (arr, length) => {
+            if length > 0 {
+              arr.elements->Array.getUnsafe(length - 1)
             } else {
               None
             }
