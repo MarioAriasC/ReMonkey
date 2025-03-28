@@ -313,6 +313,8 @@ test("builtin functions", () => {
     ("last([1,2,3])", I(3)),
     ("last([])", N),
     ("last(1)", S(`argument to "last" must be ARRAY, got MInteger`)),
+    ("rest([1,2,3])", A([2, 3])),
+    ("rest([])", N),
   ]->Array.forEach(row => {
     let (input, expected) = row
     let evaluated = testEval(input)

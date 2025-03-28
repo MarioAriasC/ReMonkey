@@ -104,6 +104,7 @@ let cLEN = "len"
 let cPUSH = "push"
 let cFIRST = "first"
 let cLAST = "last"
+let cREST = "rest"
 let argSizeCheck = (
   expectedSize: int,
   args: array<option<mObject>>,
@@ -197,6 +198,22 @@ let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
           arrayCheck(cLAST, it, (arr, length) => {
             if length > 0 {
               arr.elements->Array.getUnsafe(length - 1)
+            } else {
+              None
+            }
+          })
+        })
+      },
+    },
+  ),
+  (
+    cREST,
+    {
+      fn: args => {
+        argSizeCheck(1, args, it => {
+          arrayCheck(cREST, it, (arr, length) => {
+            if length > 0 {
+              Some(MArray({elements: arr.elements->Array.sliceToEnd(~start=1)}))
             } else {
               None
             }
