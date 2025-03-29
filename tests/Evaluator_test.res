@@ -340,3 +340,18 @@ test("builtin functions", () => {
     }
   })
 })
+
+test("array literal", () => {
+  let input = "[1, 2 * 2, 3 + 3]"
+  let evaluated = testEval(input)
+  evaluated->assertObject(o => {
+    switch o {
+    | MArray({elements}) =>
+      assertEqualsTyped(elements->Array.length, 3)
+      assertInt(elements->Array.getUnsafe(0), 1)
+      assertInt(elements->Array.getUnsafe(1), 4)
+      assertInt(elements->Array.getUnsafe(2), 6)
+    | _ => simpleFail(`object is not MArray, got=${o->typeDesc}`)
+    }
+  })
+})
