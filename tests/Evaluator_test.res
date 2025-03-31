@@ -355,3 +355,26 @@ test("array literal", () => {
     }
   })
 })
+
+test("array index expression", () => {
+  [
+    ("[1, 2, 3][0]", I(1)),
+    ("[1,2,3][1]", I(2)),
+    ("[1,2,3][2]", I(3)),
+    ("let i = 0;[1][i];", I(1)),
+    ("[1,2,3][1 + 1]", I(3)),
+    ("let myArray = [1,2,3]; myArray[2]", I(3)),
+    ("let myArray = [1,2,3]; myArray[2] + myArray[0] + myArray[1]", I(6)),
+    ("let myArray = [1,2,3]; let i = myArray[0]; myArray[i]", I(2)),
+    ("[1,2,3][3]", N),
+    ("[1,2,3][-1]", N),
+  ]->Array.forEach(row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    switch expected {
+    | I(value) => assertInt(evaluated, value)
+    | N => assertEqualsTyped(evaluated, Some(Evaluator.Eval.cNULL))
+    | _ => simpleFail("not implemented")
+    }
+  })
+})

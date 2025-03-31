@@ -95,7 +95,7 @@ module Eval: {
   }
 
   let evalArrayIndexExpression = (elements: array<option<mObject>>, index: int) => {
-    let max = Array.length(elements) + 1
+    let max = Array.length(elements) - 1
     if index < 0 || index > max {
       Some(cNULL)
     } else {
