@@ -416,3 +416,23 @@ test("hash literal", () => {
     }
   })
 })
+
+test("hash index expression", () => {
+  [
+    (`{"foo": 5}["foo"]`, I(5)),
+    (`{"foo": 5}["bar"]`, N),
+    (`let key = "foo";{"foo": 5}[key]`, I(5)),
+    (`{}["foo"]`, N),
+    (`{5:5}[5]`, I(5)),
+    (`{true:5}[true]`, I(5)),
+    (`{false:5}[false]`, I(5)),
+  ]->Array.forEach(row => {
+    let (input, expected) = row
+    let evaluated = testEval(input)
+    switch expected {
+    | I(expectedInt) => assertInt(evaluated, expectedInt)
+    | N => assertEqualsTyped(evaluated->Option.getUnsafe, Evaluator.Eval.cNULL)
+    | _ => simpleFail("not implemented")
+    }
+  })
+})
