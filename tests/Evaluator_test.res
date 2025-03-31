@@ -378,3 +378,41 @@ test("array index expression", () => {
     }
   })
 })
+
+test("hash literal", () => {
+  let input = `let two = "two";
+                	{
+                		"one": 10 - 9,
+                		two: 1 + 1,
+                		"thr" + "ee": 6 / 2,
+                		4: 4,
+                		true: 5,
+                		false: 6
+                	}`
+  let evaluated = testEval(input)
+  evaluated->assertObject(h => {
+    switch h {
+    | MHash(hash) => {
+        let expected = Map.fromArray([
+          (MString({value: "one"})->hashKey, 1),
+          (MString({value: "two"})->hashKey, 2),
+          (MString({value: "three"})->hashKey, 3),
+          (MInteger({value: 4})->hashKey, 4),
+          (Evaluator.Eval.cTRUE->hashKey, 5),
+          (Evaluator.Eval.cFALSE->hashKey, 6),
+        ])
+        assertEqualsTyped(hash.pairs->Map.size, expected->Map.size)
+        expected->Map.forEachWithKey(
+          (expectedValue, expectedKey) => {
+            let pair = hash.pairs->Map.get(expectedKey)
+            switch pair {
+            | Some(p) => assertInt(Some(p.value), expectedValue)
+            | None => simpleFail(`no pair given for key ${expectedKey}`)
+            }
+          },
+        )
+      }
+    | _ => simpleFail(`obj is not MHash, got=${h->typeDesc}`)
+    }
+  })
+})

@@ -3,6 +3,8 @@ open Objects
 module Eval: {
   let eval: (AST.program, environment) => option<mObject>
   let cNULL: mObject
+  let cTRUE: mObject
+  let cFALSE: mObject
 } = {
   let cTRUE = MBoolean({value: true})
   let cFALSE = MBoolean({value: false})
