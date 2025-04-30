@@ -18,22 +18,17 @@ module Eval: {
     }
 
   let ifNotError = (obj: option<mObject>, body: mObject => option<mObject>) => {
-    obj->Option.flatMap(o => {
-      switch o {
-      | MError(_) => Some(o)
-      | _ => body(o)
-      }
-    })
+    switch obj {
+    | Some(MError(_) as o) => Some(o)
+    | Some(o) => body(o)
+    | None => None
+    }
   }
 
   let isError = (obj: option<mObject>) => {
     switch obj {
-    | Some(o) =>
-      switch o {
-      | MError(_) => true
-      | _ => false
-      }
-    | None => false
+    | Some(MError(_)) => true
+    | _ => false
     }
   }
 
@@ -88,11 +83,19 @@ module Eval: {
 
   let extendFunctionEnv = (fun: mFunction, args: array<option<mObject>>) => {
     let env = Environment.newEnclosedEnvironment(fun.env)
-    fun.parameters->Option.forEach(params => {
-      params->Array.forEachWithIndex((identifier, i) => {
-        env->Environment.set(identifier.value, args->Array.getUnsafe(i)->Option.getUnsafe)
-      })
-    })
+    switch fun.parameters {
+    | Some(params) => {
+      let i = ref(0)
+      let len = params->Array.length
+      while i.contents < len {
+        let identifier = params->Array.getUnsafe(i.contents)
+        let arg = args->Array.getUnsafe(i.contents)->Option.getUnsafe
+        env->Environment.set(identifier.value, arg)
+        i := i.contents + 1
+      }
+    }
+    | None => ()
+    }
     env
   }
 
@@ -124,22 +127,24 @@ module Eval: {
   let rec eval = (program: AST.program, env: environment) => {
     let result: ref<option<mObject>> = ref(None)
     let keep = ref(true)
-    program.statements->Array.forEach(statement => {
-      if keep.contents {
-        result := evaluateStatement(Some(statement), env)
+    let i = ref(0)
+    let len = program.statements->Array.length
+    while keep.contents && i.contents < len {
+      let statement = program.statements->Array.getUnsafe(i.contents)
 
-        result.contents->Option.forEach(contents => {
-          switch contents {
-          | MReturnValue({value}) => {
-              result := Some(value)
-              keep := false
-            }
-          | MError(_) => keep := false
-          | _ => ()
-          }
-        })
+      result := evaluateStatement(Some(statement), env)
+
+      switch result.contents {
+      | Some(MReturnValue({value})) => {
+          result := Some(value)
+          keep := false
+        }
+      | Some(MError(_)) => keep := false
+      | _ => ()
       }
-    })
+
+      i := i.contents + 1
+    }
     result.contents
   }
   and evaluateStatement = (statement: option<AST.statement>, env: environment) => {
@@ -147,15 +152,15 @@ module Eval: {
     | Some(st) =>
       switch st {
       | AST.Identifier({value}) => {
-          let v = env->Environment.get(value)
-          if v->Option.isNone {
+          switch env->Environment.get(value) {
+          | None => {
             let fn = builtins->Map.get(value)
             switch fn {
             | Some(f) => Some(MBuiltinFunction(f))
             | None => Some(MError({message: `identifier not found: ${value}`}))
             }
-          } else {
-            v
+          }
+          | v => v
           }
         }
       | AST.IntegerLiteral(i) => Some(Objects.MInteger({value: i.value}))
@@ -176,12 +181,18 @@ module Eval: {
             }
           }
           evaluateStatement(condition, env)->ifNotError(c => {
-            if isTruthy(c) {
-              evaluateStatement(consequence->Option.map(b => AST.BlockStatement(b)), env)
-            } else if alternative->Option.isSome {
-              evaluateBlockStatement(alternative->Option.getUnsafe, env)
-            } else {
-              Some(cNULL)
+            switch (isTruthy(c), alternative) {
+            | (true, _) => {
+              let consequence = switch consequence {
+              | Some(b) => Some(AST.BlockStatement(b))
+              | None => None
+              }
+              evaluateStatement(consequence, env)
+            }
+            | (false, Some(alternative)) => {
+              evaluateBlockStatement(alternative, env)
+            }
+            | _ => Some(cNULL)
             }
           })
         }
@@ -229,9 +240,10 @@ module Eval: {
               | _ =>
                 Some(
                   MError({
-                    message: `index operator not supported: ${leftEvaluated
-                      ->Option.map(l => l->typeDesc)
-                      ->Option.getOr("")}`,
+                    message: `index operator not supported: ${switch leftEvaluated {
+                    | Some(l) => l->typeDesc
+                    | None => ""
+                    }}`,
                   }),
                 )
               }
@@ -274,7 +286,10 @@ module Eval: {
               }
             }
           })
-          returnValue.contents->Option.getOr(MHash({pairs: bodyPairs}))->Some
+          switch returnValue.contents {
+          | None => Some(MHash({pairs: bodyPairs}))
+          | value => value
+          }
         }
       | AST.ArrayLiteral({elements}) => {
           let evalElements = evalExpressions(elements, env)
@@ -292,22 +307,22 @@ module Eval: {
   and evaluateBlockStatement = (st: AST.blockStatement, env: environment) => {
     let result: ref<option<mObject>> = ref(None)
     let keep = ref(true)
-    st.statements->Option.forEach(statements => {
-      statements->Array.forEach(statement => {
-        if keep.contents {
+    switch st.statements {
+    | Some(statements) => {
+        let i = ref(0)
+        let len = statements->Array.length
+        while keep.contents && i.contents < len {
+          let statement = statements->Array.getUnsafe(i.contents)
           result := evaluateStatement(statement, env)
-          result.contents->Option.forEach(
-            contents => {
-              switch contents {
-              | MReturnValue(_) => keep := false
-              | MError(_) => keep := false
-              | _ => ()
-              }
-            },
-          )
+          switch result.contents {
+          | Some(MReturnValue(_) | MError(_)) => keep := false
+          | _ => ()
+          }
+          i := i.contents + 1
         }
-      })
-    })
+      }
+    | None => ()
+    }
     result.contents
   }
   and evalExpressions: (AST.optionStatementArray, environment) => array<option<mObject>> = (
@@ -316,9 +331,12 @@ module Eval: {
   ) => {
     let evalList: ref<array<option<mObject>>> = ref([])
     let keep = ref(true)
-    args->Option.forEach(arguments => {
-      arguments->Array.forEach(arg => {
-        if keep.contents {
+    switch args {
+    | Some(arguments) => {
+        let i = ref(0)
+        let len = arguments->Array.length
+        while keep.contents && i.contents < len {
+          let arg = arguments->Array.getUnsafe(i.contents)
           let evaluated = evaluateStatement(arg, env)
           if isError(evaluated) {
             keep := false
@@ -328,33 +346,31 @@ module Eval: {
             evalListContents->Array.push(evaluated)
             evalList := evalListContents
           }
+          i := i.contents + 1
         }
-      })
-    })
+      }
+    | None => ()
+    }
     evalList.contents
   }
   and applyFunction = (fun: mObject, args: array<option<mObject>>) => {
     switch fun {
     | MFunction(mFun) => {
         let extendEnv = extendFunctionEnv(mFun, args)
-        let evaluated = evaluateStatement(
-          mFun.body->Option.map(body => AST.BlockStatement(body)),
-          extendEnv,
-        )
-
-        evaluated->Option.map(eval => {
-          switch eval {
-          | MReturnValue({value}) => value
-          | _ => eval
-          }
-        })
+        let body = switch mFun.body {
+        | Some(body) => Some(AST.BlockStatement(body))
+        | None => None
+        }
+        switch evaluateStatement(body, extendEnv) {
+        | Some(MReturnValue({value})) => Some(value)
+        | Some(eval) => Some(eval)
+        | None => None
+        }
       }
     | MBuiltinFunction({fn}) => {
-        let result = fn(args)
-        if result->Option.isSome {
-          result
-        } else {
-          Some(cNULL)
+        switch fn(args) {
+        | None => Some(cNULL)
+        | result => result
         }
       }
     | _ => Some(MError({message: `Not a function: ${fun->typeDesc}`}))
