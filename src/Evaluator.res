@@ -85,15 +85,15 @@ module Eval: {
     let env = Environment.newEnclosedEnvironment(fun.env)
     switch fun.parameters {
     | Some(params) => {
-      let i = ref(0)
-      let len = params->Array.length
-      while i.contents < len {
-        let identifier = params->Array.getUnsafe(i.contents)
-        let arg = args->Array.getUnsafe(i.contents)->Option.getUnsafe
-        env->Environment.set(identifier.value, arg)
-        i := i.contents + 1
+        let i = ref(0)
+        let len = params->Array.length
+        while i.contents < len {
+          let identifier = params->Array.getUnsafe(i.contents)
+          let arg = args->Array.getUnsafe(i.contents)->Option.getUnsafe
+          env->Environment.set(identifier.value, arg)
+          i := i.contents + 1
+        }
       }
-    }
     | None => ()
     }
     env
@@ -151,17 +151,16 @@ module Eval: {
     switch statement {
     | Some(st) =>
       switch st {
-      | AST.Identifier({value}) => {
-          switch env->Environment.get(value) {
-          | None => {
+      | AST.Identifier({value}) =>
+        switch env->Environment.get(value) {
+        | None => {
             let fn = builtins->Map.get(value)
             switch fn {
             | Some(f) => Some(MBuiltinFunction(f))
             | None => Some(MError({message: `identifier not found: ${value}`}))
             }
           }
-          | v => v
-          }
+        | v => v
         }
       | AST.IntegerLiteral(i) => Some(Objects.MInteger({value: i.value}))
       | AST.InfixExpression({left, operator, right}) =>
@@ -183,15 +182,13 @@ module Eval: {
           evaluateStatement(condition, env)->ifNotError(c => {
             switch (isTruthy(c), alternative) {
             | (true, _) => {
-              let consequence = switch consequence {
-              | Some(b) => Some(AST.BlockStatement(b))
-              | None => None
+                let consequence = switch consequence {
+                | Some(b) => Some(AST.BlockStatement(b))
+                | None => None
+                }
+                evaluateStatement(consequence, env)
               }
-              evaluateStatement(consequence, env)
-            }
-            | (false, Some(alternative)) => {
-              evaluateBlockStatement(alternative, env)
-            }
+            | (false, Some(alternative)) => evaluateBlockStatement(alternative, env)
             | _ => Some(cNULL)
             }
           })
@@ -241,9 +238,9 @@ module Eval: {
                 Some(
                   MError({
                     message: `index operator not supported: ${switch leftEvaluated {
-                    | Some(l) => l->typeDesc
-                    | None => ""
-                    }}`,
+                      | Some(l) => l->typeDesc
+                      | None => ""
+                      }}`,
                   }),
                 )
               }
@@ -367,11 +364,10 @@ module Eval: {
         | None => None
         }
       }
-    | MBuiltinFunction({fn}) => {
-        switch fn(args) {
-        | None => Some(cNULL)
-        | result => result
-        }
+    | MBuiltinFunction({fn}) =>
+      switch fn(args) {
+      | None => Some(cNULL)
+      | result => result
       }
     | _ => Some(MError({message: `Not a function: ${fun->typeDesc}`}))
     }

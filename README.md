@@ -29,4 +29,4 @@ Any recent version of Bun 1.2.* and Node LTS to run the Benchmarks
 | `bun run res:build`                                             | Build the full project                         |
 | `bun run test`                                                  | Run all tests                                  |
 | `bun run src/Repl.res.mjs`                                      | Run the ReMonkey REPL                          |
-| `bun run src/Benchmark.res.mjs` or `node src/Benchmark.res.mjs` | Run the benchmarks, i.e. a recursive `fib(35)` |
+| `bun run src/Benchmark.res.mjs`, `node src/Benchmark.res.mjs` or `deno run src/Benchmark.res.mjs` | Run the benchmarks, i.e. a recursive `fib(35)` |
