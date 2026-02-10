@@ -87,8 +87,8 @@ and toString = (o: mObject) => {
   }
 }
 
-let typeDesc = (o: mObject) => {
-  %raw("o.TAG")
+let typeDesc = (_o: mObject) => {
+  %raw("_o.TAG")
 }
 
 let hashKey = (o: mObject) => {
@@ -96,7 +96,7 @@ let hashKey = (o: mObject) => {
   | MInteger({value}) => String.make(value)
   | MString({value}) => value
   | MBoolean({value}) => String.make(value)
-  | _ => raise(Invalid_argument(`${o->typeDesc} doesn't implement hashKey`))
+  | _ => throw(Invalid_argument(`${o->typeDesc} doesn't implement hashKey`))
   }
 }
 
@@ -213,7 +213,7 @@ let builtins: Map.t<string, mBuiltinFunction> = Map.fromArray([
         argSizeCheck(1, args, it => {
           arrayCheck(cREST, it, (arr, length) => {
             if length > 0 {
-              Some(MArray({elements: arr.elements->Array.sliceToEnd(~start=1)}))
+              Some(MArray({elements: arr.elements->Array.slice(~start=1)}))
             } else {
               None
             }

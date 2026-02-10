@@ -298,7 +298,7 @@ module Eval: {
         }
       }
 
-    | None => raise(Failure("statement shouldn't be None"))
+    | None => throw(Failure("statement shouldn't be None"))
     }
   }
   and evaluateBlockStatement = (st: AST.blockStatement, env: environment) => {
