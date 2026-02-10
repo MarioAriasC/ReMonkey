@@ -14,9 +14,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@rescript/core": "1.6.1",
     "bun-types": "^1.2.8",
-    "rescript": "11.1.4"
+    "rescript": "12.1.0"
   },
   "devDependencies": {
     "rescript-test": "^7.0.1"

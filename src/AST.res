@@ -88,7 +88,7 @@ module Statement = {
     | HashLiteral({pairs}) =>
       `{${pairs
         ->Map.keys
-        ->Core__Iterator.toArrayWithMapper(k =>
+        ->Iterator.toArrayWithMapper(k =>
           `${k->toString}:${pairs->Map.get(k)->optionToString}`
         )
         ->Array.join(", ")}}`

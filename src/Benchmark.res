@@ -4,7 +4,7 @@ let parse = (input: string) => {
   Parser.Parser.parseProgram(parser)
 }
 
-Js.log(
+Console.log(
   Evaluator.Eval.eval(
     parse(`let fibonacci = fn(x) {    	
         if (x < 2) {
